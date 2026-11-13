@@ -1,30 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">Carimbo em Lote</title>
-  <desc id="desc">Três fotografias empilhadas com selo circular de marca d'água.</desc>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#25272B"/><stop offset="1" stop-color="#111215"/>
-    </linearGradient>
-    <linearGradient id="sheet" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#E8EBEE"/>
-    </linearGradient>
-    <linearGradient id="seal" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#D5D9DD"/><stop offset=".5" stop-color="#969DA5"/><stop offset="1" stop-color="#4C535B"/>
-    </linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
-      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity=".24"/>
-    </filter>
-  </defs>
-  <g filter="url(#shadow)">
-    <rect x="37" y="25" width="76" height="80" rx="10" fill="#777D85"/>
-    <rect x="30" y="22" width="76" height="84" rx="11" fill="#BFC4C9"/>
-    <rect x="19" y="18" width="78" height="92" rx="13" fill="url(#sheet)"/>
-  </g>
-  <!-- Selo concêntrico: todas as camadas compartilham o mesmo centro -->
-  <circle cx="58" cy="63" r="24" fill="#F7F8F9"/>
-  <circle cx="58" cy="63" r="21" fill="#BFC5CB"/>
-  <circle cx="58" cy="63" r="17" fill="#89929B"/>
-  <circle cx="58" cy="63" r="12" fill="#30363D"/>
-  <circle cx="58" cy="63" r="9" fill="#20252B"/>
-  <path d="M43 50a20 20 0 0 1 30 0" fill="none" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="1.7" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Carimbo em Lote - fotografias empilhadas">
+<defs>
+ <linearGradient id="rear" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#b6bdc7"/></linearGradient>
+ <linearGradient id="mid" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e1e5eb"/><stop offset=".55" stop-color="#9099a5"/><stop offset="1" stop-color="#626b78"/></linearGradient>
+ <linearGradient id="front" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#626e7b"/><stop offset=".52" stop-color="#343e49"/><stop offset="1" stop-color="#171d26"/></linearGradient>
+ <linearGradient id="symbol" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#aab5c4"/></linearGradient>
+ <filter id="shadow" x="-25%" y="-25%" width="150%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<g transform="translate(6 5)">
+ <rect x="52" y="68" width="335" height="322" rx="57" transform="rotate(-17 219 229)" fill="#101820" opacity=".20" filter="url(#shadow)"/>
+ <g transform="rotate(-17 219 229)"><rect x="52" y="68" width="335" height="322" rx="57" fill="url(#rear)" stroke="#f5f6f8" stroke-width="6"/><path d="M78 294l86-101 58 60 52-75 89 116z" fill="#a9b1bd" opacity=".72"/><circle cx="292" cy="150" r="23" fill="#a3acb8"/></g>
+ <rect x="128" y="127" width="338" height="329" rx="57" transform="rotate(9 297 291)" fill="#101820" opacity=".23" filter="url(#shadow)"/>
+ <g transform="rotate(9 297 291)"><rect x="128" y="127" width="338" height="329" rx="57" fill="url(#mid)" stroke="#d9e0e7" stroke-width="6"/><path d="M153 358l94-112 52 58 57-79 84 133z" fill="#d8dfe8" opacity=".76"/><circle cx="385" cy="212" r="23" fill="#e8edf2" opacity=".85"/></g>
+ <rect x="196" y="219" width="277" height="265" rx="49" fill="#101820" opacity=".25" filter="url(#shadow)"/>
+ <rect x="187" y="204" width="277" height="265" rx="49" fill="url(#front)" stroke="#8996a3" stroke-width="6"/>
+ <rect x="198" y="215" width="255" height="243" rx="40" fill="none" stroke="#c2cbd4" stroke-opacity=".35" stroke-width="2"/>
+ <path d="M224 392l77-94q8-10 17 0l51 61 29-34q8-9 17 0l30 37v30q0 11-12 11H236q-18 0-12-11z" fill="url(#symbol)"/>
+ <circle cx="391" cy="285" r="25" fill="url(#symbol)"/>
+</g>
 </svg>
