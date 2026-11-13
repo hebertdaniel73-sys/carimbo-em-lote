@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Carimbo em Lote</title>
+  <desc id="desc">Três fotografias empilhadas com selo circular de marca d'água.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#25272B"/><stop offset="1" stop-color="#111215"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#E8EBEE"/>
+    </linearGradient>
+    <linearGradient id="seal" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D5D9DD"/><stop offset=".5" stop-color="#969DA5"/><stop offset="1" stop-color="#4C535B"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity=".24"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="37" y="25" width="76" height="80" rx="10" fill="#777D85"/>
+    <rect x="30" y="22" width="76" height="84" rx="11" fill="#BFC4C9"/>
+    <rect x="19" y="18" width="78" height="92" rx="13" fill="url(#sheet)"/>
+  </g>
+  <!-- Selo concêntrico: todas as camadas compartilham o mesmo centro -->
+  <circle cx="58" cy="63" r="24" fill="#F7F8F9"/>
+  <circle cx="58" cy="63" r="21" fill="#BFC5CB"/>
+  <circle cx="58" cy="63" r="17" fill="#89929B"/>
+  <circle cx="58" cy="63" r="12" fill="#30363D"/>
+  <circle cx="58" cy="63" r="9" fill="#20252B"/>
+  <path d="M43 50a20 20 0 0 1 30 0" fill="none" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="1.7" stroke-linecap="round"/>
+</svg>

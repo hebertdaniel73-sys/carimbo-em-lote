@@ -1,3 +1,5 @@
+<img src="icon.svg" alt="" width="72">
+
 # Carimbo em Lote
 
 Aplica uma logo em um lote de fotos e exporta tudo em um `.zip`, direto no navegador.
