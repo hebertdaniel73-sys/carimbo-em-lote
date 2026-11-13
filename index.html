@@ -153,6 +153,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
           <button class="btn sm" id="pNew">Salvar como nova</button>
           <button class="btn sm" id="pUpd">Atualizar</button>
           <button class="btn sm" id="pDel">Excluir</button>
+          <button class="btn sm" id="resetAll">Restaurar padrão</button>
         </div>
         <div class="btnrow" id="pNameRow" hidden>
           <input type="text" id="pName" maxlength="40" placeholder="Nome, ex.: Cliente X, canto inferior" aria-label="Nome da predefinição">
@@ -813,13 +814,29 @@ function samplePhoto(w, h, sky, sun, hills, name) {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(LS + '.logo') || 'null'); } catch {}
   if (!(saved && saved.url && await setLogoFromURL(saved.url, saved.name || 'logo', false))) await setLogoFromURL(sampleLogo(), 'sua-logo.png', true);
-  const fs = await Promise.all([
+  const fs = await samplePhotos();
+  if (!items.length) addFiles(fs, true);
+})();
+function samplePhotos() {
+  return Promise.all([
     samplePhoto(1600, 1067, ['#274C77', '#E9A66B'], '#FFE2A8', ['#3B5B6E', '#274050', '#16242E'], 'exemplo-paisagem.jpg'),
     samplePhoto(1080, 1350, ['#5B3A6B', '#F2A0A0'], '#FFD9C7', ['#6A4A78', '#45305A', '#22183A'], 'exemplo-retrato.jpg'),
     samplePhoto(1500, 1500, ['#1E6F6A', '#CFE8C8'], '#FFF6D6', ['#2F7F6C', '#1F5B52', '#103A36'], 'exemplo-quadrada.jpg')
   ]);
-  if (!items.length) addFiles(fs, true);
-})();
+}
+function disarmReset() { const b = $('resetAll'); delete b.dataset.arm; b.textContent = 'Restaurar padrão'; }
+$('resetAll').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  if (!b.dataset.arm) { b.dataset.arm = '1'; b.textContent = 'Confirmar: voltar ao início'; setTimeout(disarmReset, 4000); return; }
+  disarmReset();
+  Object.assign(S, DEF); clearTimeout(saveT);
+  try { localStorage.removeItem(LS); localStorage.removeItem(LS + '.logo'); } catch {}
+  curP = ''; fillPresets(); $('pNameRow').hidden = true;
+  items = []; if (curBmp && curBmp.close) curBmp.close(); curBmp = null; curFor = null; cur = 0; buildStrip();
+  await setLogoFromURL(sampleLogo(), 'sua-logo.png', true);
+  addFiles(await samplePhotos(), true);
+  setStatus('Tudo voltou ao padrão inicial.' + (presets.length ? ' Suas predefinições salvas foram mantidas.' : ''), 'ok');
+});
 syncUI();
 })();
 </script>
