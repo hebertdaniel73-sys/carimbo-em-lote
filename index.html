@@ -41,10 +41,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14p
 .wrap{max-width:1240px;margin:0 auto;padding-block:20px 32px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   display:flex;flex-direction:column;gap:16px}
-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
 h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:8px;align-self:center}
 h1 img{flex:none;width:40px;height:40px;margin:-6px -2px -6px -6px}
-header p{margin:0;color:var(--muted)}
+header p{margin:0;color:var(--muted);flex:1 1 0;min-width:220px}
 .credit{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;
   background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 14px 5px 10px;white-space:nowrap}
 .credit svg{flex:none;color:var(--accent)}
@@ -53,7 +53,14 @@ header p{margin:0;color:var(--muted)}
 .follow{margin:0;font-size:13px}
 .follow a{color:var(--accent);font-weight:600}
 .bench{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
-@media (max-width:860px){.bench{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){
+  .bench{grid-template-columns:minmax(0,1fr)}
+  header{flex-direction:column;align-items:stretch;gap:10px}
+  header h1{align-self:flex-start}
+  header p{flex:none;min-width:0}
+  .credit{order:-1;margin:0 auto;align-self:center}
+}
+@media (max-width:520px){.striprow .add{padding:0 10px;width:92px;line-height:1.25}}
 .left{display:flex;flex-direction:column;gap:12px;min-width:0}
 
 .bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
@@ -72,7 +79,9 @@ header p{margin:0;color:var(--muted)}
 .mk.br{bottom:-16px;right:-16px;border-left-width:1px;border-top-width:1px}
 .hint{color:var(--muted);font-size:12.5px;margin:0}
 
-.strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}
+.striprow{display:flex;gap:8px;align-items:flex-start;min-width:0}
+.striprow .add{margin-top:4px}
+.strip{flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}
 .thumb{flex:0 0 auto;position:relative;height:64px;min-width:48px;padding:0;border:2px solid transparent;border-radius:4px;background:var(--stage);cursor:pointer;overflow:hidden}
 .thumb img{height:60px;width:auto;display:block;max-width:none}
 .thumb[aria-current="true"]{border-color:var(--accent)}
@@ -151,7 +160,10 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
       </div>
       <p class="hint">Arraste a logo na prévia, ou clique onde ela deve ficar. Setas do teclado movem 1% (Shift: 5%). Ela gruda nas bordas e no centro.</p>
 
-      <div class="strip" id="strip" aria-label="Fotos do lote"></div>
+      <div class="striprow">
+        <button type="button" class="add" id="addBtn">+ Adicionar fotos</button>
+        <div class="strip" id="strip" aria-label="Fotos do lote"></div>
+      </div>
     </div>
 
     <aside class="panel">
@@ -517,10 +529,6 @@ function buildStrip() {
     b.addEventListener('click', () => show(items.indexOf(it)));
     it.el = b; strip.appendChild(b);
   });
-  const add = document.createElement('button');
-  add.type = 'button'; add.className = 'add'; add.textContent = '+ Adicionar fotos';
-  add.addEventListener('click', () => $('fileImgs').click());
-  strip.appendChild(add);
   syncUI();
 }
 let thumbing = false;
@@ -602,6 +610,7 @@ $('own').addEventListener('change', e => { const it = items[cur]; if (!it) retur
 $('prev').addEventListener('click', () => show(cur - 1));
 $('next').addEventListener('click', () => show(cur + 1));
 $('remove').addEventListener('click', () => { if (!items[cur]) return; items.splice(cur, 1); buildStrip(); show(cur); });
+$('addBtn').addEventListener('click', () => $('fileImgs').click());
 $('pickLogo').addEventListener('click', () => $('fileLogo').click());
 $('fileImgs').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
 $('fileLogo').addEventListener('change', e => { if (e.target.files[0]) loadLogoFile(e.target.files[0]); e.target.value = ''; });
