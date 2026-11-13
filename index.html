@@ -236,6 +236,29 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
           <div class="row"><label for="sat">Saturação</label><output id="satOut"></output></div>
           <input type="range" id="sat" min="0" max="200" step="1">
         </div>
+        <div class="field">
+          <div class="row"><label for="shadow">Sombra</label><output id="shadowOut"></output></div>
+          <input type="range" id="shadow" min="0" max="100" step="1">
+        </div>
+        <div id="shMore" style="display:contents">
+          <div class="two">
+            <div class="field">
+              <div class="row"><label for="shBlur">Desfoque</label><output id="shBlurOut"></output></div>
+              <input type="range" id="shBlur" min="0" max="60" step="1">
+            </div>
+            <div class="field">
+              <div class="row"><label for="shDist">Distância</label><output id="shDistOut"></output></div>
+              <input type="range" id="shDist" min="0" max="30" step="1">
+            </div>
+          </div>
+          <div class="field">
+            <label for="shColor">Cor da sombra</label>
+            <select id="shColor">
+              <option value="black">Preta (para logo clara)</option>
+              <option value="white">Branca (para logo escura)</option>
+            </select>
+          </div>
+        </div>
       </section>
 
       <section>
@@ -300,7 +323,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
 (() => {
 const $ = id => document.getElementById(id);
 const LS = 'carimbo.v1';
-const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100};
+const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100, shadow:0, shBlur:15, shDist:4, shColor:'black'};
 const DEF = {...S};
 const clean = o => { const r = {}; for (const k in DEF) if (o && typeof o[k] === typeof DEF[k]) r[k] = o[k]; return r; };
 let items = [], cur = 0, curBmp = null, curFor = null, baseCv = null, logo = null, busy = false, uid = 0;
@@ -323,6 +346,15 @@ function logoRect(W, H, pos) {
 function stamp(c, W, H, pos, k = 1) {
   if (!logo) return;
   const r = logoRect(W, H, pos);
+  if (S.shadow > 0) {
+    /* só a sombra: a logo é desenhada fora da tela e a sombra é deslocada de volta, sempre em modo normal */
+    const u = Math.min(r.w, r.h) * k, d = u * S.shDist / 100 * .7071, OFF = Math.ceil((W + r.w) * k * 2);
+    c.save(); c.globalAlpha = S.opacity / 100;
+    c.shadowColor = (S.shColor === 'white' ? 'rgba(255,255,255,' : 'rgba(0,0,0,') + S.shadow / 100 + ')';
+    c.shadowBlur = u * S.shBlur / 100; c.shadowOffsetX = OFF + d; c.shadowOffsetY = d;
+    c.drawImage(logo.img, r.x * k - OFF, r.y * k, r.w * k, r.h * k);
+    c.restore();
+  }
   c.save(); c.globalAlpha = S.opacity / 100; c.globalCompositeOperation = S.blend; c.imageSmoothingQuality = 'high';
   c.drawImage(logo.img, r.x * k, r.y * k, r.w * k, r.h * k);
   c.restore();
@@ -431,8 +463,9 @@ function syncAnchors() {
 function fmtNum(v) { return String(v).replace('.', ','); }
 function syncUI() {
   const it = items[cur], n = items.length;
-  for (const k of ['size', 'margin', 'opacity', 'quality', 'sat']) { $(k).value = S[k]; $(k + 'Out').textContent = fmtNum(S[k]) + '%'; }
+  for (const k of ['size', 'margin', 'opacity', 'quality', 'sat', 'shadow', 'shBlur', 'shDist']) { $(k).value = S[k]; $(k + 'Out').textContent = fmtNum(S[k]) + '%'; }
   $('base').value = S.base; $('fmt').value = S.fmt; $('maxSide').value = S.maxSide;
+  $('shadowOut').textContent = S.shadow ? S.shadow + '%' : 'Desligada'; $('shMore').hidden = !S.shadow; $('shColor').value = S.shColor;
   $('blend').value = S.blend; $('tint').value = S.tint; $('tintColor').value = S.tintColor;
   $('tintColorField').hidden = S.tint !== 'custom'; $('satField').hidden = S.tint !== 'orig';
   if (document.activeElement !== $('suffix')) $('suffix').value = S.suffix;
@@ -542,8 +575,8 @@ function loadLogoFile(f) {
   fr.readAsDataURL(f);
 }
 
-for (const k of ['size', 'margin', 'opacity', 'quality', 'sat']) $(k).addEventListener('input', e => { S[k] = +e.target.value; if (k === 'sat') prepLogo(); persist(); syncUI(); draw(); });
-for (const k of ['base', 'fmt', 'maxSide', 'blend', 'tint']) $(k).addEventListener('change', e => { S[k] = e.target.value; if (k === 'tint') prepLogo(); persist(); syncUI(); draw(); });
+for (const k of ['size', 'margin', 'opacity', 'quality', 'sat', 'shadow', 'shBlur', 'shDist']) $(k).addEventListener('input', e => { S[k] = +e.target.value; if (k === 'sat') prepLogo(); persist(); syncUI(); draw(); });
+for (const k of ['base', 'fmt', 'maxSide', 'blend', 'tint', 'shColor']) $(k).addEventListener('change', e => { S[k] = e.target.value; if (k === 'tint') prepLogo(); persist(); syncUI(); draw(); });
 $('tintColor').addEventListener('input', e => { S.tintColor = e.target.value; prepLogo(); persist(); draw(); });
 $('suffix').addEventListener('input', e => { S.suffix = e.target.value.replace(/[\\/:*?"<>|]/g, ''); persist(); });
 $('own').addEventListener('change', e => { const it = items[cur]; if (!it) return; it.own = e.target.checked ? {x: S.x, y: S.y} : null; syncUI(); draw(); });
@@ -694,7 +727,7 @@ function fillPresets() {
 }
 function disarm() { const b = $('pDel'); delete b.dataset.arm; b.textContent = 'Excluir'; }
 async function applyPreset(p) {
-  Object.assign(S, clean(p.s)); persist();
+  Object.assign(S, DEF, clean(p.s)); persist();
   if (okLogo(p.logo)) {
     await setLogoFromURL(p.logo.url, String(p.logo.name || 'logo'), false);
     try { localStorage.setItem(LS + '.logo', JSON.stringify(p.logo)); } catch {}

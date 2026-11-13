@@ -7,7 +7,7 @@ Aplica uma logo em um lote de fotos e exporta tudo em um `.zip`, direto no naveg
 ## O que faz
 
 - Posiciona a logo arrastando na prévia ou por 9 pontos prontos; tamanho e posição são proporcionais, então valem para fotos de formatos diferentes.
-- Ajusta tamanho, margem, opacidade, modo de mesclagem, cor (original, branca, preta ou personalizada) e saturação.
+- Ajusta tamanho, margem, opacidade, modo de mesclagem, cor (original, branca, preta ou personalizada), saturação e sombra.
 - Permite uma posição própria em fotos específicas do lote.
 - Exporta em JPG, PNG ou WebP, com qualidade e redimensionamento opcionais.
 - Salva predefinições (logo + ajustes) no navegador, com exportação e importação em arquivo.
