@@ -4,7 +4,7 @@
 
 Aplica uma logo em um lote de fotos e exporta tudo em um `.zip`, direto no navegador.
 
-**Abrir a aplicação:** https://hebertdaniel73-sys.github.io/carimbo-em-lote/
+**Abrir a aplicação:** https://carimbo.hebertdaniel.com.br/
 
 ## O que faz
 
