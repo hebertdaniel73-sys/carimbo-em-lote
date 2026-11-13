@@ -36,6 +36,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14p
 header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
 h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:0}
 header p{margin:0;color:var(--muted)}
+.credit{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;
+  background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 14px 5px 10px;white-space:nowrap}
+.credit svg{flex:none;color:var(--accent)}
+.credit b{color:var(--accent);font-weight:600}
+.credit:hover{border-color:var(--accent)}
+.follow{margin:0;font-size:13px}
+.follow a{color:var(--accent);font-weight:600}
 .bench{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
 @media (max-width:860px){.bench{grid-template-columns:minmax(0,1fr)}}
 .left{display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -111,6 +118,10 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
   <header>
     <h1>Carimbo em Lote</h1>
     <p>Posicione a logo uma vez, aplique em todas as fotos e exporte tudo em um .zip. Nada sai do seu navegador.</p>
+    <a class="credit" href="https://www.instagram.com/hebert_daniel.73/" target="_blank" rel="noopener" aria-label="Criado por @hebert_daniel.73, abrir o Instagram">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="3.5"/><circle cx="8" cy="8" r="3"/><circle cx="11.6" cy="4.4" r=".6" fill="currentColor"/></svg>
+      <span>Criado por <b>@hebert_daniel.73</b></span>
+    </a>
   </header>
 
   <div class="bench">
@@ -275,6 +286,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
         <button class="btn" id="exportOne">Salvar só esta foto</button>
         <progress id="prog" max="1" value="0" hidden></progress>
         <p class="status" id="status" role="status" aria-live="polite"></p>
+        <p class="follow" id="follow" hidden>Foi útil? Siga <a href="https://www.instagram.com/hebert_daniel.73/" target="_blank" rel="noopener">@hebert_daniel.73</a> no Instagram.</p>
       </section>
     </aside>
   </div>
@@ -555,7 +567,7 @@ addEventListener('paste', e => { const fs = e.clipboardData && e.clipboardData.f
 let rT; addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(fitCanvas, 80); });
 
 /* ---------- exportação ---------- */
-function setStatus(t, cls) { const s = $('status'); s.textContent = t; s.className = 'status' + (cls ? ' ' + cls : ''); }
+function setStatus(t, cls) { const s = $('status'); s.textContent = t; s.className = 'status' + (cls ? ' ' + cls : ''); $('follow').hidden = true; }
 function outType(it) {
   let f = S.fmt;
   if (f === 'orig') f = /png/.test(it.file.type) ? 'png' : /webp/.test(it.file.type) ? 'webp' : 'jpg';
@@ -622,8 +634,8 @@ async function saveFile(filename, blob) {
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   return 'ok';
 }
-function report(r, okMsg) {
-  if (r === 'ok') setStatus(okMsg, 'ok');
+function report(r, okMsg, promo) {
+  if (r === 'ok') { setStatus(okMsg, 'ok'); if (promo) $('follow').hidden = false; }
   else if (r === 'declined') setStatus('Download cancelado. Clique de novo para tentar.', 'bad');
   else if (r === 'rate') setStatus('Já existe um pedido de download aberto. Aguarde e tente de novo.', 'bad');
   else setStatus('Arquivo grande demais para este aplicativo. Reduza o "Lado maior" ou exporte em partes.', 'bad');
@@ -636,7 +648,7 @@ async function run(fn) {
 $('exportOne').addEventListener('click', () => run(async () => {
   const it = items[cur]; setStatus('Gerando…');
   const o = await renderOut(it, curFor === it.id ? curBmp : null);
-  report(await saveFile(stem(it.name) + S.suffix + '.' + o.ext, o.blob), 'Foto salva.');
+  report(await saveFile(stem(it.name) + S.suffix + '.' + o.ext, o.blob), 'Foto salva.', true);
 }));
 $('exportAll').addEventListener('click', () => run(async () => {
   const list = items.filter(x => !x.err), zip = [], used = new Set(), prog = $('prog');
@@ -658,7 +670,7 @@ $('exportAll').addEventListener('click', () => run(async () => {
   setStatus('Montando o .zip…');
   const blob = makeZip(zip);
   const done = list.length - fail;
-  report(await saveFile('fotos-com-logo.zip', blob), done + (done === 1 ? ' foto exportada.' : ' fotos exportadas.') + (fail ? ' ' + fail + ' não puderam ser abertas.' : ''));
+  report(await saveFile('fotos-com-logo.zip', blob), done + (done === 1 ? ' foto exportada.' : ' fotos exportadas.') + (fail ? ' ' + fail + ' não puderam ser abertas.' : ''), true);
 }));
 
 /* ---------- predefinições ---------- */

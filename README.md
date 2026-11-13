@@ -17,3 +17,7 @@ As fotos são processadas no próprio navegador e não são enviadas a nenhum se
 ## Estrutura
 
 Um único arquivo, `index.html`, sem dependências nem etapa de build. Para usar offline, basta abrir o arquivo no navegador.
+
+## Autor
+
+Criado por [@hebert_daniel.73](https://www.instagram.com/hebert_daniel.73/).
