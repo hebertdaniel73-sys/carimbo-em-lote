@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Posicione uma logo uma vez, aplique em um lote de fotos e exporte tudo em um .zip, direto no navegador.">
+<title>Carimbo em Lote</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: bancada de trabalho. Palco da foto à esquerda com a tira de miniaturas embaixo;
+   à direita, uma coluna única de ajustes que termina no botão de exportar. */
+:root{
+  --bg:#ECEEF1; --surface:#FFFFFF; --stage:#DCE0E5; --ink:#15181C; --muted:#5C6570;
+  --line:#CDD2D9; --accent:#B8146F; --accent-ink:#FFFFFF; --accent-soft:#F7E3EF;
+  --ok:#1B7A4B; --warn:#A85800;
+  --display:"Space Grotesk","Inter",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121418; --surface:#1B1E24; --stage:#0B0C0F; --ink:#ECEEF1; --muted:#98A1AD;
+    --line:#2E333C; --accent:#F0619F; --accent-ink:#1A0610; --accent-soft:#3A1528;
+    --ok:#5CCB91; --warn:#F0A64A; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121418; --surface:#1B1E24; --stage:#0B0C0F; --ink:#ECEEF1; --muted:#98A1AD;
+  --line:#2E333C; --accent:#F0619F; --accent-ink:#1A0610; --accent-soft:#3A1528;
+  --ok:#5CCB91; --warn:#F0A64A; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 32px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:0}
+header p{margin:0;color:var(--muted)}
+.bench{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+@media (max-width:860px){.bench{grid-template-columns:minmax(0,1fr)}}
+.left{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.bar .info{flex:1 1 180px;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar .info b{color:var(--ink);font-weight:600}
+.chip{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px solid currentColor;border-radius:99px;padding:1px 8px}
+
+.stage{background:var(--stage);border-radius:6px;padding:28px;display:flex;justify-content:center;align-items:center;min-height:260px}
+.frame{position:relative;line-height:0}
+.frame canvas{display:block;touch-action:none;cursor:grab;outline-offset:6px}
+.frame canvas.drag{cursor:grabbing}
+.mk{position:absolute;width:12px;height:12px;border:0 solid var(--muted);pointer-events:none}
+.mk.tl{top:-16px;left:-16px;border-right-width:1px;border-bottom-width:1px}
+.mk.tr{top:-16px;right:-16px;border-left-width:1px;border-bottom-width:1px}
+.mk.bl{bottom:-16px;left:-16px;border-right-width:1px;border-top-width:1px}
+.mk.br{bottom:-16px;right:-16px;border-left-width:1px;border-top-width:1px}
+.hint{color:var(--muted);font-size:12.5px;margin:0}
+
+.strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}
+.thumb{flex:0 0 auto;position:relative;height:64px;min-width:48px;padding:0;border:2px solid transparent;border-radius:4px;background:var(--stage);cursor:pointer;overflow:hidden}
+.thumb img{height:60px;width:auto;display:block;max-width:none}
+.thumb[aria-current="true"]{border-color:var(--accent)}
+.thumb .own{position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:var(--accent);border:1.5px solid var(--surface)}
+.thumb.err{width:64px;color:var(--warn);font-size:11px}
+.add{flex:0 0 auto;height:64px;padding:0 16px;border:1.5px dashed var(--line);border-radius:4px;background:transparent;color:var(--ink);font:inherit;font-weight:500;cursor:pointer}
+.add:hover{border-color:var(--accent);color:var(--accent)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column}
+.panel section{padding:16px;display:flex;flex-direction:column;gap:12px}
+.panel section + section{border-top:1px solid var(--line)}
+h2{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0}
+.logobox{display:flex;align-items:center;gap:12px;min-width:0}
+.logoprev{flex:0 0 72px;height:48px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+  background:repeating-conic-gradient(var(--stage) 0 25%,var(--line) 0 50%) 0 0/12px 12px}
+.logoprev img{max-width:64px;max-height:40px}
+.logoname{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field .row{display:flex;justify-content:space-between;gap:8px}
+.field output{font-variant-numeric:tabular-nums;color:var(--muted)}
+label{font-weight:500}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+select,input[type=text]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%;min-width:0}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+.btnrow input[type=text]{flex:1 1 140px}
+input[type=color]{width:100%;height:33px;padding:2px;border:1px solid var(--line);border-radius:4px;background:var(--bg);cursor:pointer}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.posrow{display:flex;gap:16px;align-items:center}
+.anchors{display:grid;grid-template-columns:repeat(3,26px);gap:4px;padding:6px;background:var(--bg);border:1px solid var(--line);border-radius:4px}
+.anchors button{width:26px;height:26px;padding:0;border:0;background:transparent;border-radius:3px;cursor:pointer;display:grid;place-items:center}
+.anchors button::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--line)}
+.anchors button:hover::before{background:var(--muted)}
+.anchors button[aria-pressed="true"]::before{background:var(--accent);width:12px;height:12px}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:400}
+.check input{accent-color:var(--accent);margin-top:2px}
+.btn{font:inherit;font-weight:600;border-radius:4px;padding:8px 12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);padding:11px 12px;font-size:15px}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:4px 9px;font-weight:500}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+progress{width:100%;height:6px;accent-color:var(--accent)}
+.status{margin:0;min-height:1.4em;color:var(--muted);font-size:13px}
+.status.ok{color:var(--ok)} .status.bad{color:var(--warn)}
+body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Carimbo em Lote</h1>
+    <p>Posicione a logo uma vez, aplique em todas as fotos e exporte tudo em um .zip. Nada sai do seu navegador.</p>
+  </header>
+
+  <div class="bench">
+    <div class="left">
+      <div class="bar">
+        <button class="btn sm" id="prev" aria-label="Foto anterior">‹</button>
+        <button class="btn sm" id="next" aria-label="Próxima foto">›</button>
+        <span class="info" id="info">Carregando…</span>
+        <span class="chip" id="sampleChip" hidden>exemplo</span>
+        <button class="btn sm" id="remove">Remover foto</button>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="frame">
+          <span class="mk tl"></span><span class="mk tr"></span><span class="mk bl"></span><span class="mk br"></span>
+          <canvas id="cv" width="600" height="400" tabindex="0" aria-label="Prévia da foto com a logo. Arraste a logo ou use as setas do teclado para mover."></canvas>
+        </div>
+      </div>
+      <p class="hint">Arraste a logo na prévia, ou clique onde ela deve ficar. Setas do teclado movem 1% (Shift: 5%). Ela gruda nas bordas e no centro.</p>
+
+      <div class="strip" id="strip" aria-label="Fotos do lote"></div>
+    </div>
+
+    <aside class="panel">
+      <section>
+        <h2>Predefinições</h2>
+        <select id="preset" aria-label="Predefinição salva"></select>
+        <div class="btnrow">
+          <button class="btn sm" id="pNew">Salvar como nova</button>
+          <button class="btn sm" id="pUpd">Atualizar</button>
+          <button class="btn sm" id="pDel">Excluir</button>
+        </div>
+        <div class="btnrow" id="pNameRow" hidden>
+          <input type="text" id="pName" maxlength="40" placeholder="Nome, ex.: Cliente X, canto inferior" aria-label="Nome da predefinição">
+          <button class="btn sm" id="pOk">Salvar</button>
+          <button class="btn sm" id="pCancel">Cancelar</button>
+        </div>
+        <p class="hint">Guarda a logo e todos os ajustes neste navegador. Para levar a outro computador:
+          <button class="btn sm" id="pExp">Exportar arquivo</button> <button class="btn sm" id="pImp">Importar arquivo</button></p>
+      </section>
+      <section>
+        <h2>Logo</h2>
+        <div class="logobox" id="logobox">
+          <div class="logoprev"><img id="logoImg" alt=""></div>
+          <span class="logoname" id="logoName">—</span>
+          <button class="btn sm" id="pickLogo">Trocar</button>
+        </div>
+        <div class="field">
+          <div class="row"><label for="size">Tamanho</label><output id="sizeOut"></output></div>
+          <input type="range" id="size" min="2" max="80" step="0.5">
+        </div>
+        <div class="field">
+          <label for="base">Tamanho relativo a</label>
+          <select id="base">
+            <option value="min">Menor lado da foto</option>
+            <option value="w">Largura da foto</option>
+            <option value="h">Altura da foto</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="row"><label for="opacity">Opacidade</label><output id="opacityOut"></output></div>
+          <input type="range" id="opacity" min="5" max="100" step="1">
+        </div>
+        <div class="field">
+          <label for="blend">Mesclagem</label>
+          <select id="blend">
+            <option value="source-over">Normal</option>
+            <optgroup label="Escurecer">
+              <option value="darken">Escurecer</option>
+              <option value="multiply">Multiplicação</option>
+              <option value="color-burn">Superexposição de cor</option>
+            </optgroup>
+            <optgroup label="Clarear">
+              <option value="lighten">Clarear</option>
+              <option value="screen">Divisão</option>
+              <option value="color-dodge">Subexposição de cor</option>
+              <option value="lighter">Subexposição linear (adicionar)</option>
+            </optgroup>
+            <optgroup label="Contraste">
+              <option value="overlay">Sobrepor</option>
+              <option value="soft-light">Luz indireta</option>
+              <option value="hard-light">Luz direta</option>
+            </optgroup>
+            <optgroup label="Inversão">
+              <option value="difference">Diferença</option>
+              <option value="exclusion">Exclusão</option>
+            </optgroup>
+            <optgroup label="Cor">
+              <option value="hue">Matiz</option>
+              <option value="saturation">Saturação</option>
+              <option value="color">Cor</option>
+              <option value="luminosity">Luminosidade</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="two">
+          <div class="field">
+            <label for="tint">Cor da logo</label>
+            <select id="tint">
+              <option value="orig">Original</option>
+              <option value="white">Toda branca</option>
+              <option value="black">Toda preta</option>
+              <option value="custom">Personalizada</option>
+            </select>
+          </div>
+          <div class="field" id="tintColorField">
+            <label for="tintColor">Cor</label>
+            <input type="color" id="tintColor">
+          </div>
+        </div>
+        <div class="field" id="satField">
+          <div class="row"><label for="sat">Saturação</label><output id="satOut"></output></div>
+          <input type="range" id="sat" min="0" max="200" step="1">
+        </div>
+      </section>
+
+      <section>
+        <h2>Posição</h2>
+        <div class="posrow">
+          <div class="anchors" id="anchors" role="group" aria-label="Posições prontas"></div>
+          <div class="field" style="flex:1;min-width:0">
+            <div class="row"><label for="margin">Margem</label><output id="marginOut"></output></div>
+            <input type="range" id="margin" min="0" max="20" step="0.5">
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="own"><span>Posição própria só nesta foto <span style="color:var(--muted)">(as outras seguem o padrão)</span></span></label>
+      </section>
+
+      <section>
+        <h2>Exportar</h2>
+        <div class="two">
+          <div class="field">
+            <label for="fmt">Formato</label>
+            <select id="fmt">
+              <option value="jpg">JPG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WebP</option>
+              <option value="orig">Igual ao original</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="maxSide">Lado maior</label>
+            <select id="maxSide">
+              <option value="0">Original</option>
+              <option value="1080">1080 px</option>
+              <option value="1350">1350 px</option>
+              <option value="1920">1920 px</option>
+              <option value="2560">2560 px</option>
+              <option value="3840">3840 px</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="qualityField">
+          <div class="row"><label for="quality">Qualidade</label><output id="qualityOut"></output></div>
+          <input type="range" id="quality" min="40" max="100" step="1">
+        </div>
+        <div class="field">
+          <label for="suffix">Sufixo no nome do arquivo</label>
+          <input type="text" id="suffix" maxlength="30" spellcheck="false">
+        </div>
+        <button class="btn primary" id="exportAll">Exportar</button>
+        <button class="btn" id="exportOne">Salvar só esta foto</button>
+        <progress id="prog" max="1" value="0" hidden></progress>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<input type="file" id="fileImgs" accept="image/*" multiple hidden>
+<input type="file" id="fileLogo" accept="image/*" hidden>
+<input type="file" id="filePre" accept=".json,application/json" hidden>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const LS = 'carimbo.v1';
+const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100};
+const DEF = {...S};
+const clean = o => { const r = {}; for (const k in DEF) if (o && typeof o[k] === typeof DEF[k]) r[k] = o[k]; return r; };
+let items = [], cur = 0, curBmp = null, curFor = null, baseCv = null, logo = null, busy = false, uid = 0;
+const cv = $('cv'), ctx = cv.getContext('2d');
+
+try { Object.assign(S, clean(JSON.parse(localStorage.getItem(LS) || '{}'))); } catch {}
+let saveT;
+const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch {} }, 300); };
+
+const dlP = (window.claude && window.claude.use) ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null);
+
+/* ---------- geometria: a mesma conta vale para a prévia e para a exportação ---------- */
+function logoRect(W, H, pos) {
+  const base = S.base === 'w' ? W : S.base === 'h' ? H : Math.min(W, H);
+  let lw = base * S.size / 100, lh = lw * logo.h / logo.w;
+  const m = Math.min(W, H) * S.margin / 100;
+  const rx = Math.max(W - lw - 2 * m, 0), ry = Math.max(H - lh - 2 * m, 0);
+  return {x: (W - lw - rx) / 2 + pos.x * rx, y: (H - lh - ry) / 2 + pos.y * ry, w: lw, h: lh, m, rx, ry};
+}
+function stamp(c, W, H, pos, k = 1) {
+  if (!logo) return;
+  const r = logoRect(W, H, pos);
+  c.save(); c.globalAlpha = S.opacity / 100; c.globalCompositeOperation = S.blend; c.imageSmoothingQuality = 'high';
+  c.drawImage(logo.img, r.x * k, r.y * k, r.w * k, r.h * k);
+  c.restore();
+}
+const posOf = it => it.own || S;
+
+/* ---------- prévia ---------- */
+let guides = null;
+function fitCanvas() {
+  const it = items[cur]; if (!it || !curBmp) return;
+  const stage = $('stage'), availW = Math.max(stage.clientWidth - 56, 120);
+  const availH = Math.max(Math.min(window.innerHeight * 0.62, 640), 220);
+  const s = Math.min(availW / curBmp.width, availH / curBmp.height, 1);
+  const cw = Math.round(curBmp.width * s), ch = Math.round(curBmp.height * s);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+  baseCv = document.createElement('canvas'); baseCv.width = cv.width; baseCv.height = cv.height;
+  const b = baseCv.getContext('2d'); b.imageSmoothingQuality = 'high';
+  b.drawImage(curBmp, 0, 0, cv.width, cv.height);
+  draw();
+}
+function draw() {
+  const it = items[cur];
+  if (!it || !curBmp || !baseCv) { ctx.clearRect(0, 0, cv.width, cv.height); return; }
+  ctx.drawImage(baseCv, 0, 0);
+  const k = cv.width / curBmp.width;
+  stamp(ctx, curBmp.width, curBmp.height, posOf(it), k);
+  if (guides && logo) {
+    const r = logoRect(curBmp.width, curBmp.height, posOf(it));
+    const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.save(); ctx.strokeStyle = acc; ctx.lineWidth = Math.max(1, cv.width / 600);
+    ctx.setLineDash([6, 4]); ctx.strokeRect(r.x * k, r.y * k, r.w * k, r.h * k);
+    ctx.setLineDash([]);
+    if (guides.x) { const gx = (r.x + r.w / 2) * k; ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, cv.height); ctx.stroke(); }
+    if (guides.y) { const gy = (r.y + r.h / 2) * k; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(cv.width, gy); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+async function show(i) {
+  cur = Math.max(0, Math.min(i, items.length - 1));
+  const it = items[cur];
+  syncUI();
+  if (!it) { curBmp = null; curFor = null; cv.style.width = '300px'; cv.style.height = '200px'; cv.width = 300; cv.height = 200; draw(); return; }
+  if (curFor !== it.id) {
+    try {
+      const bmp = await createImageBitmap(it.file);
+      if (items[cur] !== it) { bmp.close && bmp.close(); return; }
+      if (curBmp && curBmp.close) curBmp.close();
+      curBmp = bmp; curFor = it.id; it.w = bmp.width; it.h = bmp.height;
+    } catch { it.err = true; curBmp = null; curFor = null; }
+  }
+  syncUI(); fitCanvas();
+}
+
+/* ---------- arrastar / teclado ---------- */
+const snap = v => { for (const t of [0, .5, 1]) if (Math.abs(v - t) < .025) return t; return v; };
+const clamp = v => Math.max(0, Math.min(1, v));
+function setPos(x, y) {
+  const it = items[cur]; if (!it) return;
+  const tgt = it.own || S; tgt.x = x; tgt.y = y;
+  if (!it.own) persist();
+  draw(); syncAnchors();
+}
+let grab = null;
+const toImg = e => { const k = curBmp.width / cv.clientWidth; return {x: e.offsetX * k, y: e.offsetY * k}; };
+function dragTo(e) {
+  const p = toImg(e), it = items[cur], r = logoRect(curBmp.width, curBmp.height, posOf(it));
+  const ox = (curBmp.width - r.w - r.rx) / 2, oy = (curBmp.height - r.h - r.ry) / 2;
+  const x = r.rx ? snap(clamp((p.x - grab.dx - ox) / r.rx)) : .5;
+  const y = r.ry ? snap(clamp((p.y - grab.dy - oy) / r.ry)) : .5;
+  guides = {x: x === .5, y: y === .5};
+  setPos(x, y);
+}
+cv.addEventListener('pointerdown', e => {
+  if (!curBmp || !logo) return;
+  const p = toImg(e), r = logoRect(curBmp.width, curBmp.height, posOf(items[cur]));
+  const inside = p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+  grab = inside ? {dx: p.x - r.x, dy: p.y - r.y} : {dx: r.w / 2, dy: r.h / 2};
+  cv.setPointerCapture(e.pointerId); cv.classList.add('drag'); dragTo(e);
+});
+cv.addEventListener('pointermove', e => { if (grab) dragTo(e); });
+const endDrag = () => { if (!grab) return; grab = null; guides = null; cv.classList.remove('drag'); draw(); };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('keydown', e => {
+  const d = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[e.key];
+  if (!d || !items[cur]) return;
+  e.preventDefault();
+  const st = e.shiftKey ? .05 : .01, p = posOf(items[cur]);
+  setPos(clamp(+(p.x + d[0] * st).toFixed(4)), clamp(+(p.y + d[1] * st).toFixed(4)));
+});
+
+/* ---------- interface ---------- */
+const names = ['Canto superior esquerdo', 'Topo, centro', 'Canto superior direito', 'Centro, esquerda', 'Centro', 'Centro, direita', 'Canto inferior esquerdo', 'Base, centro', 'Canto inferior direito'];
+names.forEach((n, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.title = n; b.setAttribute('aria-label', n);
+  b.dataset.x = (i % 3) / 2; b.dataset.y = Math.floor(i / 3) / 2;
+  b.addEventListener('click', () => setPos(+b.dataset.x, +b.dataset.y));
+  $('anchors').appendChild(b);
+});
+function syncAnchors() {
+  const p = items[cur] ? posOf(items[cur]) : S;
+  for (const b of $('anchors').children) b.setAttribute('aria-pressed', String(+b.dataset.x === p.x && +b.dataset.y === p.y));
+}
+function fmtNum(v) { return String(v).replace('.', ','); }
+function syncUI() {
+  const it = items[cur], n = items.length;
+  for (const k of ['size', 'margin', 'opacity', 'quality', 'sat']) { $(k).value = S[k]; $(k + 'Out').textContent = fmtNum(S[k]) + '%'; }
+  $('base').value = S.base; $('fmt').value = S.fmt; $('maxSide').value = S.maxSide;
+  $('blend').value = S.blend; $('tint').value = S.tint; $('tintColor').value = S.tintColor;
+  $('tintColorField').hidden = S.tint !== 'custom'; $('satField').hidden = S.tint !== 'orig';
+  if (document.activeElement !== $('suffix')) $('suffix').value = S.suffix;
+  $('qualityField').hidden = S.fmt === 'png';
+  const info = $('info'); info.textContent = '';
+  if (it) {
+    const b = document.createElement('b'); b.textContent = (cur + 1) + ' / ' + n;
+    info.append(b, ' · ' + it.name + (it.w ? ' · ' + it.w + '×' + it.h : '') + (it.err ? ' · não foi possível abrir' : ''));
+  } else info.textContent = 'Nenhuma foto. Adicione ou arraste suas fotos para cá.';
+  $('sampleChip').hidden = !(it && it.sample);
+  $('own').checked = !!(it && it.own); $('own').disabled = !it;
+  $('prev').disabled = cur <= 0; $('next').disabled = cur >= n - 1; $('remove').disabled = !it;
+  const good = items.filter(x => !x.err).length;
+  $('exportAll').textContent = good ? 'Exportar ' + good + (good === 1 ? ' foto' : ' fotos') + ' (.zip)' : 'Exportar';
+  $('exportAll').disabled = busy || !good || !logo; $('exportOne').disabled = busy || !it || it.err || !logo;
+  [...$('strip').querySelectorAll('.thumb')].forEach((t, i) => {
+    t.setAttribute('aria-current', String(i === cur));
+    const dot = t.querySelector('.own'); if (dot) dot.hidden = !items[i].own;
+  });
+  syncAnchors();
+}
+function buildStrip() {
+  const strip = $('strip'); strip.textContent = '';
+  items.forEach((it, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'thumb' + (it.err ? ' err' : ''); b.title = it.name;
+    b.setAttribute('aria-label', 'Foto ' + (i + 1) + ': ' + it.name);
+    if (it.thumb) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; b.appendChild(im); }
+    else if (it.err) b.textContent = 'erro';
+    const dot = document.createElement('span'); dot.className = 'own'; dot.hidden = !it.own; b.appendChild(dot);
+    b.addEventListener('click', () => show(items.indexOf(it)));
+    it.el = b; strip.appendChild(b);
+  });
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'add'; add.textContent = '+ Adicionar fotos';
+  add.addEventListener('click', () => $('fileImgs').click());
+  strip.appendChild(add);
+  syncUI();
+}
+let thumbing = false;
+async function thumbQueue() {
+  if (thumbing) return; thumbing = true;
+  for (;;) {
+    const it = items.find(x => !x.thumb && !x.err); if (!it) break;
+    try {
+      const bmp = await createImageBitmap(it.file);
+      it.w = bmp.width; it.h = bmp.height;
+      const c = document.createElement('canvas'); c.height = 120; c.width = Math.max(1, Math.round(120 * bmp.width / bmp.height));
+      const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(bmp, 0, 0, c.width, c.height);
+      bmp.close && bmp.close();
+      it.thumb = c.toDataURL('image/jpeg', .7);
+      if (it.el && items.includes(it)) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; it.el.prepend(im); }
+    } catch { it.err = true; if (it.el) { it.el.classList.add('err'); it.el.prepend('erro'); } syncUI(); }
+  }
+  thumbing = false;
+}
+function addFiles(files, sample = false) {
+  const list = [...files].filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name));
+  if (!list.length) return;
+  if (!sample) items = items.filter(x => !x.sample);
+  const first = items.length;
+  for (const f of list) items.push({id: ++uid, file: f, name: f.name, sample, own: null, thumb: '', err: false});
+  buildStrip(); thumbQueue(); show(sample ? 0 : first); setStatus('');
+}
+/* cor e saturação: a logo é tratada uma vez e o resultado serve à prévia e à exportação */
+function prepLogo() {
+  if (!logo) return;
+  if (S.tint === 'orig' && S.sat === 100) { logo.img = logo.src; return; }
+  const long = Math.max(logo.w, logo.h), svg = /^data:image\/svg/.test(logo.url);
+  const sc = long > 2400 ? 2400 / long : (svg && long < 1600 ? 1600 / long : 1);
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(logo.w * sc)); c.height = Math.max(1, Math.round(logo.h * sc));
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(logo.src, 0, 0, c.width, c.height);
+  if (S.tint !== 'orig') {
+    x.globalCompositeOperation = 'source-in';
+    x.fillStyle = S.tint === 'white' ? '#fff' : S.tint === 'black' ? '#000' : S.tintColor;
+    x.fillRect(0, 0, c.width, c.height);
+  } else {
+    const d = x.getImageData(0, 0, c.width, c.height), a = d.data, k = S.sat / 100;
+    for (let i = 0; i < a.length; i += 4) {
+      const g = .2126 * a[i] + .7152 * a[i + 1] + .0722 * a[i + 2];
+      a[i] = g + (a[i] - g) * k; a[i + 1] = g + (a[i + 1] - g) * k; a[i + 2] = g + (a[i + 2] - g) * k;
+    }
+    x.putImageData(d, 0, 0);
+  }
+  logo.img = c;
+}
+function setLogoFromURL(url, name, sample) {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      const w = im.naturalWidth || 600, h = im.naturalHeight || 200;
+      logo = {src: im, img: im, w, h, name, sample, url}; prepLogo();
+      $('logoImg').src = url; $('logoName').textContent = name + (sample ? ' (exemplo)' : '');
+      syncUI(); draw(); res(true);
+    };
+    im.onerror = () => { setStatus('Não foi possível abrir essa logo. Use PNG, SVG, JPG ou WebP.', 'bad'); res(false); };
+    im.src = url;
+  });
+}
+function loadLogoFile(f) {
+  const fr = new FileReader();
+  fr.onload = async () => {
+    if (await setLogoFromURL(fr.result, f.name, false)) {
+      try { if (fr.result.length < 1.5e6) localStorage.setItem(LS + '.logo', JSON.stringify({url: fr.result, name: f.name})); else localStorage.removeItem(LS + '.logo'); } catch {}
+    }
+  };
+  fr.readAsDataURL(f);
+}
+
+for (const k of ['size', 'margin', 'opacity', 'quality', 'sat']) $(k).addEventListener('input', e => { S[k] = +e.target.value; if (k === 'sat') prepLogo(); persist(); syncUI(); draw(); });
+for (const k of ['base', 'fmt', 'maxSide', 'blend', 'tint']) $(k).addEventListener('change', e => { S[k] = e.target.value; if (k === 'tint') prepLogo(); persist(); syncUI(); draw(); });
+$('tintColor').addEventListener('input', e => { S.tintColor = e.target.value; prepLogo(); persist(); draw(); });
+$('suffix').addEventListener('input', e => { S.suffix = e.target.value.replace(/[\\/:*?"<>|]/g, ''); persist(); });
+$('own').addEventListener('change', e => { const it = items[cur]; if (!it) return; it.own = e.target.checked ? {x: S.x, y: S.y} : null; syncUI(); draw(); });
+$('prev').addEventListener('click', () => show(cur - 1));
+$('next').addEventListener('click', () => show(cur + 1));
+$('remove').addEventListener('click', () => { if (!items[cur]) return; items.splice(cur, 1); buildStrip(); show(cur); });
+$('pickLogo').addEventListener('click', () => $('fileLogo').click());
+$('fileImgs').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+$('fileLogo').addEventListener('change', e => { if (e.target.files[0]) loadLogoFile(e.target.files[0]); e.target.value = ''; });
+
+let overN = 0;
+addEventListener('dragenter', e => { e.preventDefault(); overN++; document.body.classList.add('over'); });
+addEventListener('dragleave', () => { if (--overN <= 0) { overN = 0; document.body.classList.remove('over'); } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => {
+  e.preventDefault(); overN = 0; document.body.classList.remove('over');
+  const fs = e.dataTransfer && e.dataTransfer.files; if (!fs || !fs.length) return;
+  if (e.target.closest && e.target.closest('#logobox')) loadLogoFile(fs[0]); else addFiles(fs);
+});
+addEventListener('paste', e => { const fs = e.clipboardData && e.clipboardData.files; if (fs && fs.length) addFiles(fs); });
+let rT; addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(fitCanvas, 80); });
+
+/* ---------- exportação ---------- */
+function setStatus(t, cls) { const s = $('status'); s.textContent = t; s.className = 'status' + (cls ? ' ' + cls : ''); }
+function outType(it) {
+  let f = S.fmt;
+  if (f === 'orig') f = /png/.test(it.file.type) ? 'png' : /webp/.test(it.file.type) ? 'webp' : 'jpg';
+  return {ext: f, mime: f === 'jpg' ? 'image/jpeg' : 'image/' + f};
+}
+async function renderOut(it, bmpIn) {
+  const bmp = bmpIn || await createImageBitmap(it.file);
+  try {
+    const max = +S.maxSide, long = Math.max(bmp.width, bmp.height);
+    const s = max && long > max ? max / long : 1;
+    const W = Math.round(bmp.width * s), H = Math.round(bmp.height * s);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    const t = outType(it);
+    if (t.ext === 'jpg') { x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
+    x.drawImage(bmp, 0, 0, W, H);
+    stamp(x, W, H, posOf(it));
+    const blob = await new Promise(r => c.toBlob(r, t.mime, S.quality / 100));
+    c.width = c.height = 0;
+    if (!blob) throw new Error('toBlob');
+    return {blob, ext: blob.type === t.mime ? t.ext : 'png'};
+  } finally { if (!bmpIn && bmp.close) bmp.close(); }
+}
+/* .zip sem compressão (as fotos já são comprimidas), montado aqui mesmo */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u) { let c = -1; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; }
+function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = [], d = new Date();
+  const time = d.getHours() << 11 | d.getMinutes() << 5 | d.getSeconds() >> 1;
+  const date = (d.getFullYear() - 1980) << 9 | (d.getMonth() + 1) << 5 | d.getDate();
+  let off = 0;
+  for (const f of files) {
+    const nm = enc.encode(f.name), crc = crc32(f.data), n = f.data.length;
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true);
+    h.setUint32(18, n, true); h.setUint32(22, n, true); h.setUint16(26, nm.length, true);
+    parts.push(h.buffer, nm, f.data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true);
+    c.setUint32(20, n, true); c.setUint32(24, n, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    central.push(c.buffer, nm);
+    off += 30 + nm.length + n;
+  }
+  const cdSize = central.reduce((a, b) => a + b.byteLength, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, cdSize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, e.buffer], {type: 'application/zip'});
+}
+const stem = n => n.replace(/\.[^.]+$/, '') || 'foto';
+async function saveFile(filename, blob) {
+  const d = await dlP;
+  if (d) {
+    try { await d.save({filename, data: blob}); return 'ok'; }
+    catch (e) {
+      if (e && e.code === 'declined') return 'declined';
+      if (e && e.code === 'rate_limited') return 'rate';
+      if (e && e.code === 'too_large') return 'large';
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  return 'ok';
+}
+function report(r, okMsg) {
+  if (r === 'ok') setStatus(okMsg, 'ok');
+  else if (r === 'declined') setStatus('Download cancelado. Clique de novo para tentar.', 'bad');
+  else if (r === 'rate') setStatus('Já existe um pedido de download aberto. Aguarde e tente de novo.', 'bad');
+  else setStatus('Arquivo grande demais para este aplicativo. Reduza o "Lado maior" ou exporte em partes.', 'bad');
+}
+async function run(fn) {
+  if (busy) return; busy = true; syncUI();
+  try { await fn(); } catch (e) { setStatus('Algo falhou na exportação: ' + (e && e.message || e), 'bad'); }
+  busy = false; $('prog').hidden = true; syncUI();
+}
+$('exportOne').addEventListener('click', () => run(async () => {
+  const it = items[cur]; setStatus('Gerando…');
+  const o = await renderOut(it, curFor === it.id ? curBmp : null);
+  report(await saveFile(stem(it.name) + S.suffix + '.' + o.ext, o.blob), 'Foto salva.');
+}));
+$('exportAll').addEventListener('click', () => run(async () => {
+  const list = items.filter(x => !x.err), zip = [], used = new Set(), prog = $('prog');
+  prog.hidden = false; prog.max = list.length; prog.value = 0;
+  let fail = 0;
+  for (let i = 0; i < list.length; i++) {
+    setStatus('Aplicando a logo: ' + (i + 1) + ' de ' + list.length + '…');
+    try {
+      const o = await renderOut(list[i]);
+      let name = stem(list[i].name) + S.suffix, n = name, k = 2;
+      while (used.has((n + '.' + o.ext).toLowerCase())) n = name + '-' + k++;
+      used.add((n + '.' + o.ext).toLowerCase());
+      zip.push({name: n + '.' + o.ext, data: new Uint8Array(await o.blob.arrayBuffer())});
+    } catch { fail++; }
+    prog.value = i + 1;
+    await new Promise(r => setTimeout(r));
+  }
+  if (fail === list.length) { setStatus('Nenhuma foto pôde ser processada.', 'bad'); return; }
+  setStatus('Montando o .zip…');
+  const blob = makeZip(zip);
+  const done = list.length - fail;
+  report(await saveFile('fotos-com-logo.zip', blob), done + (done === 1 ? ' foto exportada.' : ' fotos exportadas.') + (fail ? ' ' + fail + ' não puderam ser abertas.' : ''));
+}));
+
+/* ---------- predefinições ---------- */
+const PK = LS + '.presets';
+let presets = [], curP = '';
+try { presets = JSON.parse(localStorage.getItem(PK) || '[]'); } catch {}
+if (!Array.isArray(presets)) presets = [];
+const okLogo = l => l && typeof l.url === 'string' && l.url.startsWith('data:image/');
+const storePresets = () => { try { localStorage.setItem(PK, JSON.stringify(presets)); return true; } catch { return false; } };
+const snapNow = () => ({s: {...S}, logo: logo && !logo.sample ? {url: logo.url, name: logo.name} : null});
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const NOROOM = 'Sem espaço neste navegador para salvar. Exclua uma predefinição ou use uma logo menor.';
+function fillPresets() {
+  const sel = $('preset'); sel.textContent = '';
+  const o0 = document.createElement('option'); o0.value = ''; o0.textContent = presets.length ? 'Escolher predefinição…' : 'Nenhuma salva ainda'; sel.appendChild(o0);
+  for (const p of presets) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); }
+  if (!presets.some(p => p.id === curP)) curP = '';
+  sel.value = curP;
+  $('pUpd').disabled = $('pDel').disabled = !curP; $('pExp').disabled = !presets.length;
+  disarm();
+}
+function disarm() { const b = $('pDel'); delete b.dataset.arm; b.textContent = 'Excluir'; }
+async function applyPreset(p) {
+  Object.assign(S, clean(p.s)); persist();
+  if (okLogo(p.logo)) {
+    await setLogoFromURL(p.logo.url, String(p.logo.name || 'logo'), false);
+    try { localStorage.setItem(LS + '.logo', JSON.stringify(p.logo)); } catch {}
+  } else prepLogo();
+  syncUI(); draw(); setStatus('Predefinição "' + p.name + '" aplicada.', 'ok');
+}
+$('preset').addEventListener('change', e => { curP = e.target.value; fillPresets(); const p = presets.find(x => x.id === curP); if (p) applyPreset(p); });
+$('pNew').addEventListener('click', () => { $('pNameRow').hidden = false; $('pName').value = ''; $('pName').focus(); });
+$('pCancel').addEventListener('click', () => { $('pNameRow').hidden = true; });
+function saveNew() {
+  const name = $('pName').value.trim() || 'Predefinição ' + (presets.length + 1);
+  const p = {id: newId(), name, ...snapNow()}; presets.push(p);
+  if (!storePresets()) { presets.pop(); setStatus(NOROOM, 'bad'); return; }
+  curP = p.id; $('pNameRow').hidden = true; fillPresets();
+  setStatus('Predefinição "' + name + '" salva' + (p.logo ? '.' : ' (sem a logo de exemplo).'), 'ok');
+}
+$('pOk').addEventListener('click', saveNew);
+$('pName').addEventListener('keydown', e => { if (e.key === 'Enter') saveNew(); if (e.key === 'Escape') $('pNameRow').hidden = true; });
+$('pUpd').addEventListener('click', () => {
+  const i = presets.findIndex(x => x.id === curP); if (i < 0) return;
+  const old = presets[i]; presets[i] = {id: old.id, name: old.name, ...snapNow()};
+  if (!storePresets()) { presets[i] = old; setStatus(NOROOM, 'bad'); return; }
+  setStatus('Predefinição "' + old.name + '" atualizada com os ajustes atuais.', 'ok');
+});
+$('pDel').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (!b.dataset.arm) { b.dataset.arm = '1'; b.textContent = 'Confirmar exclusão'; setTimeout(disarm, 4000); return; }
+  const p = presets.find(x => x.id === curP); presets = presets.filter(x => x.id !== curP); storePresets(); curP = ''; fillPresets();
+  if (p) setStatus('Predefinição "' + p.name + '" excluída.', 'ok');
+});
+$('pExp').addEventListener('click', async () => {
+  report(await saveFile('carimbo-predefinicoes.json', new Blob([JSON.stringify({carimbo: 1, presets})], {type: 'application/json'})), 'Arquivo de predefinições salvo.');
+});
+$('pImp').addEventListener('click', () => $('filePre').click());
+$('filePre').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()), arr = Array.isArray(j) ? j : j.presets, before = presets.slice();
+    let n = 0;
+    for (const p of arr) {
+      if (!p || typeof p.name !== 'string' || !p.s) continue;
+      presets.push({id: newId(), name: p.name.slice(0, 40), s: clean(p.s), logo: okLogo(p.logo) ? {url: p.logo.url, name: String(p.logo.name || 'logo')} : null}); n++;
+    }
+    if (!n) throw 0;
+    if (!storePresets()) { presets = before; setStatus(NOROOM, 'bad'); return; }
+    fillPresets(); setStatus(n + (n === 1 ? ' predefinição importada.' : ' predefinições importadas.'), 'ok');
+  } catch { setStatus('Esse arquivo não é um arquivo de predefinições do Carimbo.', 'bad'); }
+});
+fillPresets();
+
+/* ---------- estado inicial: exemplos, até você trazer os seus arquivos ---------- */
+function sampleLogo() {
+  const c = document.createElement('canvas'); c.width = 700; c.height = 200;
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.strokeStyle = '#fff'; x.lineWidth = 14;
+  x.beginPath(); x.arc(100, 100, 70, 0, Math.PI * 2); x.stroke();
+  x.beginPath(); x.arc(100, 100, 28, 0, Math.PI * 2); x.fill();
+  x.font = '700 80px Arial, Helvetica, sans-serif'; x.textBaseline = 'middle'; x.fillText('SUA LOGO', 200, 106);
+  return c.toDataURL('image/png');
+}
+function samplePhoto(w, h, sky, sun, hills, name) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
+  x.fillStyle = sun; x.beginPath(); x.arc(w * .68, h * .42, Math.min(w, h) * .11, 0, Math.PI * 2); x.fill();
+  hills.forEach((col, i) => {
+    x.fillStyle = col; x.beginPath(); x.moveTo(0, h);
+    const top = h * (.55 + i * .13);
+    for (let px = 0; px <= w; px += w / 40) x.lineTo(px, top + Math.sin(px / w * (5 + i * 2) + i * 2) * h * .05 + Math.sin(px / w * 13 + i) * h * .015);
+    x.lineTo(w, h); x.fill();
+  });
+  return new Promise(r => c.toBlob(b => r(new File([b], name, {type: 'image/jpeg'})), 'image/jpeg', .9));
+}
+(async () => {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LS + '.logo') || 'null'); } catch {}
+  if (!(saved && saved.url && await setLogoFromURL(saved.url, saved.name || 'logo', false))) await setLogoFromURL(sampleLogo(), 'sua-logo.png', true);
+  const fs = await Promise.all([
+    samplePhoto(1600, 1067, ['#274C77', '#E9A66B'], '#FFE2A8', ['#3B5B6E', '#274050', '#16242E'], 'exemplo-paisagem.jpg'),
+    samplePhoto(1080, 1350, ['#5B3A6B', '#F2A0A0'], '#FFD9C7', ['#6A4A78', '#45305A', '#22183A'], 'exemplo-retrato.jpg'),
+    samplePhoto(1500, 1500, ['#1E6F6A', '#CFE8C8'], '#FFF6D6', ['#2F7F6C', '#1F5B52', '#103A36'], 'exemplo-quadrada.jpg')
+  ]);
+  if (!items.length) addFiles(fs, true);
+})();
+syncUI();
+})();
+</script>
+</body>
+</html>
