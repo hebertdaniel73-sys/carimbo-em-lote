@@ -251,12 +251,19 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
               <input type="range" id="shDist" min="0" max="30" step="1">
             </div>
           </div>
-          <div class="field">
-            <label for="shColor">Cor da sombra</label>
-            <select id="shColor">
-              <option value="black">Preta (para logo clara)</option>
-              <option value="white">Branca (para logo escura)</option>
-            </select>
+          <div class="two">
+            <div class="field">
+              <label for="shColor">Cor da sombra</label>
+              <select id="shColor">
+                <option value="black">Preta</option>
+                <option value="white">Branca</option>
+                <option value="custom">Personalizada</option>
+              </select>
+            </div>
+            <div class="field" id="shHexField">
+              <label for="shHex">Cor</label>
+              <input type="color" id="shHex">
+            </div>
           </div>
         </div>
       </section>
@@ -323,7 +330,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
 (() => {
 const $ = id => document.getElementById(id);
 const LS = 'carimbo.v1';
-const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100, shadow:0, shBlur:15, shDist:4, shColor:'black'};
+const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100, shadow:0, shBlur:15, shDist:4, shColor:'black', shHex:'#1e3a8a'};
 const DEF = {...S};
 const clean = o => { const r = {}; for (const k in DEF) if (o && typeof o[k] === typeof DEF[k]) r[k] = o[k]; return r; };
 let items = [], cur = 0, curBmp = null, curFor = null, baseCv = null, logo = null, busy = false, uid = 0;
@@ -350,7 +357,8 @@ function stamp(c, W, H, pos, k = 1) {
     /* só a sombra: a logo é desenhada fora da tela e a sombra é deslocada de volta, sempre em modo normal */
     const u = Math.min(r.w, r.h) * k, d = u * S.shDist / 100 * .7071, OFF = Math.ceil((W + r.w) * k * 2);
     c.save(); c.globalAlpha = S.opacity / 100;
-    c.shadowColor = (S.shColor === 'white' ? 'rgba(255,255,255,' : 'rgba(0,0,0,') + S.shadow / 100 + ')';
+    const hx = S.shColor === 'white' ? '#ffffff' : S.shColor === 'custom' && /^#[0-9a-f]{6}$/i.test(S.shHex) ? S.shHex : '#000000';
+    c.shadowColor = 'rgba(' + parseInt(hx.slice(1, 3), 16) + ',' + parseInt(hx.slice(3, 5), 16) + ',' + parseInt(hx.slice(5, 7), 16) + ',' + S.shadow / 100 + ')';
     c.shadowBlur = u * S.shBlur / 100; c.shadowOffsetX = OFF + d; c.shadowOffsetY = d;
     c.drawImage(logo.img, r.x * k - OFF, r.y * k, r.w * k, r.h * k);
     c.restore();
@@ -465,7 +473,7 @@ function syncUI() {
   const it = items[cur], n = items.length;
   for (const k of ['size', 'margin', 'opacity', 'quality', 'sat', 'shadow', 'shBlur', 'shDist']) { $(k).value = S[k]; $(k + 'Out').textContent = fmtNum(S[k]) + '%'; }
   $('base').value = S.base; $('fmt').value = S.fmt; $('maxSide').value = S.maxSide;
-  $('shadowOut').textContent = S.shadow ? S.shadow + '%' : 'Desligada'; $('shMore').hidden = !S.shadow; $('shColor').value = S.shColor;
+  $('shadowOut').textContent = S.shadow ? S.shadow + '%' : 'Desligada'; $('shMore').hidden = !S.shadow; $('shColor').value = S.shColor; $('shHex').value = S.shHex; $('shHexField').hidden = S.shColor !== 'custom';
   $('blend').value = S.blend; $('tint').value = S.tint; $('tintColor').value = S.tintColor;
   $('tintColorField').hidden = S.tint !== 'custom'; $('satField').hidden = S.tint !== 'orig';
   if (document.activeElement !== $('suffix')) $('suffix').value = S.suffix;
@@ -578,6 +586,7 @@ function loadLogoFile(f) {
 for (const k of ['size', 'margin', 'opacity', 'quality', 'sat', 'shadow', 'shBlur', 'shDist']) $(k).addEventListener('input', e => { S[k] = +e.target.value; if (k === 'sat') prepLogo(); persist(); syncUI(); draw(); });
 for (const k of ['base', 'fmt', 'maxSide', 'blend', 'tint', 'shColor']) $(k).addEventListener('change', e => { S[k] = e.target.value; if (k === 'tint') prepLogo(); persist(); syncUI(); draw(); });
 $('tintColor').addEventListener('input', e => { S.tintColor = e.target.value; prepLogo(); persist(); draw(); });
+$('shHex').addEventListener('input', e => { S.shHex = e.target.value; persist(); draw(); });
 $('suffix').addEventListener('input', e => { S.suffix = e.target.value.replace(/[\\/:*?"<>|]/g, ''); persist(); });
 $('own').addEventListener('change', e => { const it = items[cur]; if (!it) return; it.own = e.target.checked ? {x: S.x, y: S.y} : null; syncUI(); draw(); });
 $('prev').addEventListener('click', () => show(cur - 1));
