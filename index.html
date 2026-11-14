@@ -42,9 +42,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14p
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   display:flex;flex-direction:column;gap:16px}
 header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
-h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:8px;align-self:center}
+h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:8px;align-self:flex-start}
 h1 img{flex:none;width:40px;height:40px;margin:-6px -2px -6px -6px}
-header p{margin:0;color:var(--muted);flex:1 1 0;min-width:220px}
+header p{margin:0;color:var(--muted)}
+.brand{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 320px}
 .credit{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;
   background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 14px 5px 10px;white-space:nowrap}
 .credit svg{flex:none;color:var(--accent)}
@@ -57,7 +58,7 @@ header p{margin:0;color:var(--muted);flex:1 1 0;min-width:220px}
   .bench{grid-template-columns:minmax(0,1fr)}
   header{flex-direction:column;align-items:stretch;gap:10px}
   header h1{align-self:flex-start}
-  header p{flex:none;min-width:0}
+  .brand{flex:none}
   .credit{order:-1;margin:0 auto;align-self:center}
 }
 @media (pointer:coarse){select,input[type=text]{font-size:16px}}
@@ -135,8 +136,10 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
 <body>
 <div class="wrap">
   <header>
+    <div class="brand">
     <h1><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IkNhcmltYm8gZW0gTG90ZSAtIGZvdG9ncmFmaWFzIGVtcGlsaGFkYXMiPgo8ZGVmcz4KIDxsaW5lYXJHcmFkaWVudCBpZD0icmVhciIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIHN0b3AtY29sb3I9IiNmZmZmZmYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNiNmJkYzciLz48L2xpbmVhckdyYWRpZW50PgogPGxpbmVhckdyYWRpZW50IGlkPSJtaWQiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBzdG9wLWNvbG9yPSIjZTFlNWViIi8+PHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiM5MDk5YTUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM2MjZiNzgiLz48L2xpbmVhckdyYWRpZW50PgogPGxpbmVhckdyYWRpZW50IGlkPSJmcm9udCIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIHN0b3AtY29sb3I9IiM2MjZlN2IiLz48c3RvcCBvZmZzZXQ9Ii41MiIgc3RvcC1jb2xvcj0iIzM0M2U0OSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE3MWQyNiIvPjwvbGluZWFyR3JhZGllbnQ+CiA8bGluZWFyR3JhZGllbnQgaWQ9InN5bWJvbCIgeDE9IjAiIHkxPSIwIiB4Mj0iLjgiIHkyPSIxIj48c3RvcCBzdG9wLWNvbG9yPSIjZmZmZmZmIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYWFiNWM0Ii8+PC9saW5lYXJHcmFkaWVudD4KIDxmaWx0ZXIgaWQ9InNoYWRvdyIgeD0iLTI1JSIgeT0iLTI1JSIgd2lkdGg9IjE1MCUiIGhlaWdodD0iMTYwJSI+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iOSIvPjwvZmlsdGVyPgo8L2RlZnM+CjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYgNSkiPgogPHJlY3QgeD0iNTIiIHk9IjY4IiB3aWR0aD0iMzM1IiBoZWlnaHQ9IjMyMiIgcng9IjU3IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTcgMjE5IDIyOSkiIGZpbGw9IiMxMDE4MjAiIG9wYWNpdHk9Ii4yMCIgZmlsdGVyPSJ1cmwoI3NoYWRvdykiLz4KIDxnIHRyYW5zZm9ybT0icm90YXRlKC0xNyAyMTkgMjI5KSI+PHJlY3QgeD0iNTIiIHk9IjY4IiB3aWR0aD0iMzM1IiBoZWlnaHQ9IjMyMiIgcng9IjU3IiBmaWxsPSJ1cmwoI3JlYXIpIiBzdHJva2U9IiNmNWY2ZjgiIHN0cm9rZS13aWR0aD0iNiIvPjxwYXRoIGQ9Ik03OCAyOTRsODYtMTAxIDU4IDYwIDUyLTc1IDg5IDExNnoiIGZpbGw9IiNhOWIxYmQiIG9wYWNpdHk9Ii43MiIvPjxjaXJjbGUgY3g9IjI5MiIgY3k9IjE1MCIgcj0iMjMiIGZpbGw9IiNhM2FjYjgiLz48L2c+CiA8cmVjdCB4PSIxMjgiIHk9IjEyNyIgd2lkdGg9IjMzOCIgaGVpZ2h0PSIzMjkiIHJ4PSI1NyIgdHJhbnNmb3JtPSJyb3RhdGUoOSAyOTcgMjkxKSIgZmlsbD0iIzEwMTgyMCIgb3BhY2l0eT0iLjIzIiBmaWx0ZXI9InVybCgjc2hhZG93KSIvPgogPGcgdHJhbnNmb3JtPSJyb3RhdGUoOSAyOTcgMjkxKSI+PHJlY3QgeD0iMTI4IiB5PSIxMjciIHdpZHRoPSIzMzgiIGhlaWdodD0iMzI5IiByeD0iNTciIGZpbGw9InVybCgjbWlkKSIgc3Ryb2tlPSIjZDllMGU3IiBzdHJva2Utd2lkdGg9IjYiLz48cGF0aCBkPSJNMTUzIDM1OGw5NC0xMTIgNTIgNTggNTctNzkgODQgMTMzeiIgZmlsbD0iI2Q4ZGZlOCIgb3BhY2l0eT0iLjc2Ii8+PGNpcmNsZSBjeD0iMzg1IiBjeT0iMjEyIiByPSIyMyIgZmlsbD0iI2U4ZWRmMiIgb3BhY2l0eT0iLjg1Ii8+PC9nPgogPHJlY3QgeD0iMTk2IiB5PSIyMTkiIHdpZHRoPSIyNzciIGhlaWdodD0iMjY1IiByeD0iNDkiIGZpbGw9IiMxMDE4MjAiIG9wYWNpdHk9Ii4yNSIgZmlsdGVyPSJ1cmwoI3NoYWRvdykiLz4KIDxyZWN0IHg9IjE4NyIgeT0iMjA0IiB3aWR0aD0iMjc3IiBoZWlnaHQ9IjI2NSIgcng9IjQ5IiBmaWxsPSJ1cmwoI2Zyb250KSIgc3Ryb2tlPSIjODk5NmEzIiBzdHJva2Utd2lkdGg9IjYiLz4KIDxyZWN0IHg9IjE5OCIgeT0iMjE1IiB3aWR0aD0iMjU1IiBoZWlnaHQ9IjI0MyIgcng9IjQwIiBmaWxsPSJub25lIiBzdHJva2U9IiNjMmNiZDQiIHN0cm9rZS1vcGFjaXR5PSIuMzUiIHN0cm9rZS13aWR0aD0iMiIvPgogPHBhdGggZD0iTTIyNCAzOTJsNzctOTRxOC0xMCAxNyAwbDUxIDYxIDI5LTM0cTgtOSAxNyAwbDMwIDM3djMwcTAgMTEtMTIgMTFIMjM2cS0xOCAwLTEyLTExeiIgZmlsbD0idXJsKCNzeW1ib2wpIi8+CiA8Y2lyY2xlIGN4PSIzOTEiIGN5PSIyODUiIHI9IjI1IiBmaWxsPSJ1cmwoI3N5bWJvbCkiLz4KPC9nPgo8L3N2Zz4K" alt="" width="40" height="40">Carimbo em Lote</h1>
     <p>Posicione a logo uma vez, aplique em todas as fotos e exporte tudo em um .zip. Nada sai do seu navegador.</p>
+    </div>
     <a class="credit" href="https://www.instagram.com/hebert_daniel.73/" target="_blank" rel="noopener" aria-label="Criado por @hebert_daniel.73, abrir o Instagram">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="3.5"/><circle cx="8" cy="8" r="3"/><circle cx="11.6" cy="4.4" r=".6" fill="currentColor"/></svg>
       <span>Criado por <b>@hebert_daniel.73</b></span>
