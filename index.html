@@ -57,6 +57,7 @@ header p{margin:0;color:var(--muted)}
 .follow{margin:0;font-size:13px}
 .follow a{color:var(--accent);font-weight:600}
 .bench{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+@media (min-width:861px){.left{position:sticky;top:16px;align-self:start}}
 @media (max-width:860px){
   .bench{grid-template-columns:minmax(0,1fr)}
   header{flex-direction:column;align-items:stretch;gap:10px}
@@ -403,7 +404,7 @@ let guides = null;
 function fitCanvas() {
   const it = items[cur]; if (!it || !curBmp) return;
   const stage = $('stage'), availW = Math.max(stage.clientWidth - 56, 120);
-  const availH = Math.max(Math.min(window.innerHeight * 0.62, 640), 220);
+  const availH = Math.max(Math.min(window.innerHeight * 0.62, 640, window.innerHeight - 270), 220);
   const s = Math.min(availW / curBmp.width, availH / curBmp.height, 1);
   const cw = Math.round(curBmp.width * s), ch = Math.round(curBmp.height * s);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
