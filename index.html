@@ -83,6 +83,9 @@ footer p{margin:0;font-size:12px}
 .mk.bl{bottom:-16px;left:-16px;border-right-width:1px;border-top-width:1px}
 .mk.br{bottom:-16px;right:-16px;border-left-width:1px;border-top-width:1px}
 .hint{color:var(--muted);font-size:12.5px;margin:0}
+.drop{flex:1;min-height:240px;display:grid;place-content:center;gap:6px;text-align:center;border:1.5px dashed var(--muted);border-radius:6px;background:transparent;color:var(--muted);font:inherit;cursor:pointer}
+.drop b{color:var(--ink);font-size:16px;font-weight:600}
+.drop:hover,body.over .drop{border-color:var(--accent);color:var(--accent)}
 
 .striprow{display:flex;gap:8px;align-items:flex-start;min-width:0}
 .striprow .add{margin-top:4px}
@@ -165,7 +168,8 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
       </div>
 
       <div class="stage" id="stage">
-        <div class="frame">
+        <button type="button" class="drop" id="dropEmpty" hidden><b>Arraste suas fotos para cá</b><span>ou clique para escolher do computador</span></button>
+        <div class="frame" id="frame">
           <span class="mk tl"></span><span class="mk tr"></span><span class="mk bl"></span><span class="mk br"></span>
           <canvas id="cv" width="600" height="400" tabindex="0" aria-label="Prévia da foto com a logo. Arraste a logo ou use as setas do teclado para mover."></canvas>
         </div>
@@ -417,6 +421,27 @@ function stamp(c, W, H, pos, k = 1) {
 }
 const posOf = it => it.own || S;
 
+/* ---------- abrir imagens: uma por vez, com um segundo caminho se o primeiro falhar ---------- */
+let decQ = Promise.resolve();
+function viaImg(file) {
+  return new Promise((res, rej) => {
+    const u = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(u); im.naturalWidth ? res(im) : rej(new Error('vazia')); };
+    im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('decode')); };
+    im.src = u;
+  });
+}
+function decode(file) {
+  const run = async () => { try { return await createImageBitmap(file); } catch { return await viaImg(file); } };
+  const p = decQ.then(run, run); decQ = p.catch(() => {}); return p;
+}
+function makeThumb(it, bmp) {
+  const c = document.createElement('canvas'); c.height = 120; c.width = Math.max(1, Math.round(120 * bmp.width / bmp.height));
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(bmp, 0, 0, c.width, c.height);
+  it.thumb = c.toDataURL('image/jpeg', .7);
+  if (it.el && items.includes(it) && !it.el.querySelector('img')) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; it.el.prepend(im); }
+}
+
 /* ---------- prévia ---------- */
 let guides = null;
 function fitCanvas() {
@@ -454,14 +479,17 @@ async function show(i) {
   cur = Math.max(0, Math.min(i, items.length - 1));
   const it = items[cur];
   syncUI();
-  if (!it) { curBmp = null; curFor = null; cv.style.width = '300px'; cv.style.height = '200px'; cv.width = 300; cv.height = 200; draw(); return; }
+  if (!it) { if (curBmp && curBmp.close) curBmp.close(); curBmp = null; curFor = null; cv.style.width = '300px'; cv.style.height = '200px'; cv.width = 300; cv.height = 200; draw(); return; }
   if (curFor !== it.id) {
+    const wasErr = it.err; it.err = false;
+    if (curBmp && curBmp.close) curBmp.close(); curBmp = null; curFor = null; /* libera a foto anterior antes de abrir a próxima */
     try {
-      const bmp = await createImageBitmap(it.file);
+      const bmp = await decode(it.file);
       if (items[cur] !== it) { bmp.close && bmp.close(); return; }
-      if (curBmp && curBmp.close) curBmp.close();
       curBmp = bmp; curFor = it.id; it.w = bmp.width; it.h = bmp.height;
-    } catch { it.err = true; curBmp = null; curFor = null; }
+      if (!it.thumb) makeThumb(it, bmp);
+      if (wasErr) buildStrip();
+    } catch { it.err = true; if (!wasErr) buildStrip(); }
   }
   syncUI(); fitCanvas();
 }
@@ -530,9 +558,10 @@ function syncUI() {
   const info = $('info'); info.textContent = '';
   if (it) {
     const b = document.createElement('b'); b.textContent = (cur + 1) + ' / ' + n;
-    info.append(b, ' · ' + it.name + (it.w ? ' · ' + it.w + '×' + it.h : '') + (it.err ? ' · não foi possível abrir' : ''));
+    info.append(b, ' · ' + it.name + (it.w ? ' · ' + it.w + '×' + it.h : '') + (it.err ? ' · não foi possível abrir (clique na miniatura para tentar de novo)' : ''));
   } else info.textContent = 'Nenhuma foto. Adicione ou arraste suas fotos para cá.';
   $('sampleChip').hidden = !(it && it.sample);
+  $('dropEmpty').hidden = !!it; $('frame').hidden = !it;
   $('own').checked = !!(it && it.own); $('own').disabled = !it;
   $('prev').disabled = cur <= 0; $('next').disabled = cur >= n - 1; $('remove').disabled = !it;
   const good = items.filter(x => !x.err).length;
@@ -562,15 +591,12 @@ let thumbing = false;
 async function thumbQueue() {
   if (thumbing) return; thumbing = true;
   for (;;) {
-    const it = items.find(x => !x.thumb && !x.err); if (!it) break;
+    const it = items.find(x => !x.thumb && !x.err && x !== items[cur]); if (!it) break;
     try {
-      const bmp = await createImageBitmap(it.file);
+      const bmp = await decode(it.file);
       it.w = bmp.width; it.h = bmp.height;
-      const c = document.createElement('canvas'); c.height = 120; c.width = Math.max(1, Math.round(120 * bmp.width / bmp.height));
-      const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(bmp, 0, 0, c.width, c.height);
+      if (!it.thumb) makeThumb(it, bmp);
       bmp.close && bmp.close();
-      it.thumb = c.toDataURL('image/jpeg', .7);
-      if (it.el && items.includes(it)) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; it.el.prepend(im); }
     } catch { it.err = true; if (it.el) { it.el.classList.add('err'); it.el.prepend('erro'); } syncUI(); }
   }
   thumbing = false;
@@ -643,6 +669,7 @@ $('prev').addEventListener('click', () => show(cur - 1));
 $('next').addEventListener('click', () => show(cur + 1));
 $('remove').addEventListener('click', () => { if (!items[cur]) return; items.splice(cur, 1); buildStrip(); show(cur); });
 $('addBtn').addEventListener('click', () => $('fileImgs').click());
+$('dropEmpty').addEventListener('click', () => $('fileImgs').click());
 $('rotLogo').addEventListener('click', () => { S.rot = (S.rot + 1) % 4; prepLogo(); persist(); syncUI(); draw(); });
 $('flipLogo').addEventListener('click', () => { S.flip = !S.flip; prepLogo(); persist(); syncUI(); draw(); });
 $('pickLogo').addEventListener('click', () => $('fileLogo').click());
@@ -669,7 +696,7 @@ function outType(it) {
   return {ext: f, mime: f === 'jpg' ? 'image/jpeg' : 'image/' + f};
 }
 async function renderOut(it, bmpIn) {
-  const bmp = bmpIn || await createImageBitmap(it.file);
+  const bmp = bmpIn || await decode(it.file);
   try {
     const max = +S.maxSide, long = Math.max(bmp.width, bmp.height);
     const s = max && long > max ? max / long : 1;
