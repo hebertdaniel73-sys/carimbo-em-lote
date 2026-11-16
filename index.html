@@ -128,6 +128,12 @@ input[type=color]{width:100%;height:33px;padding:2px;border:1px solid var(--line
 .btn.primary:hover{filter:brightness(1.08)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.sm{padding:4px 9px;font-weight:500}
+.btn.ico{padding:0;width:28px;height:28px;flex:none;display:grid;place-items:center;color:var(--muted)}
+.btn.ico:hover{color:var(--ink)}
+.btn.ico[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+.logobox{gap:8px}
+.logoprev img{transition:transform .15s}
+@media (prefers-reduced-motion:reduce){.logoprev img{transition:none}}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 progress{width:100%;height:6px;accent-color:var(--accent)}
 .status{margin:0;min-height:1.4em;color:var(--muted);font-size:13px}
@@ -195,6 +201,12 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
         <div class="logobox" id="logobox">
           <div class="logoprev"><img id="logoImg" alt=""></div>
           <span class="logoname" id="logoName">—</span>
+          <button class="btn sm ico" id="rotLogo" title="Girar 90°" aria-label="Girar a logo 90 graus">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13.2 2v3h-3"/></svg>
+          </button>
+          <button class="btn sm ico" id="flipLogo" title="Espelhar" aria-label="Espelhar a logo" aria-pressed="false">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5v13" stroke-dasharray="2 2"/><path d="M6 4 1.5 12H6z"/><path d="M10 4l4.5 8H10z" fill="currentColor"/></svg>
+          </button>
           <button class="btn sm" id="pickLogo">Trocar</button>
         </div>
         <div class="field">
@@ -365,7 +377,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
 (() => {
 const $ = id => document.getElementById(id);
 const LS = 'carimbo.v1';
-const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100, shadow:0, shBlur:15, shDist:4, shColor:'black', shHex:'#1e3a8a'};
+const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100, shadow:0, shBlur:15, shDist:4, shColor:'black', shHex:'#1e3a8a', rot:0, flip:false};
 const DEF = {...S};
 const clean = o => { const r = {}; for (const k in DEF) if (o && typeof o[k] === typeof DEF[k]) r[k] = o[k]; return r; };
 let items = [], cur = 0, curBmp = null, curFor = null, baseCv = null, logo = null, busy = false, uid = 0;
@@ -381,6 +393,7 @@ const dlP = (window.claude && window.claude.use) ? window.claude.use('downloads'
 function logoRect(W, H, pos) {
   const base = S.base === 'w' ? W : S.base === 'h' ? H : Math.min(W, H);
   let lw = base * S.size / 100, lh = lw * logo.h / logo.w;
+  if (logo.odd) { lh = base * S.size / 100; lw = lh * logo.w / logo.h; } /* girada: o tamanho segue valendo para o comprimento original */
   const m = Math.min(W, H) * S.margin / 100;
   const rx = Math.max(W - lw - 2 * m, 0), ry = Math.max(H - lh - 2 * m, 0);
   return {x: (W - lw - rx) / 2 + pos.x * rx, y: (H - lh - ry) / 2 + pos.y * ry, w: lw, h: lh, m, rx, ry};
@@ -509,6 +522,7 @@ function syncUI() {
   for (const k of ['size', 'margin', 'opacity', 'quality', 'sat', 'shadow', 'shBlur', 'shDist']) { $(k).value = S[k]; $(k + 'Out').textContent = fmtNum(S[k]) + '%'; }
   $('base').value = S.base; $('fmt').value = S.fmt; $('maxSide').value = S.maxSide;
   $('shadowOut').textContent = S.shadow ? S.shadow + '%' : 'Desligada'; $('shMore').hidden = !S.shadow; $('shColor').value = S.shColor; $('shHex').value = S.shHex; $('shHexField').hidden = S.shColor !== 'custom';
+  $('logoImg').style.transform = 'rotate(' + S.rot * 90 + 'deg) scaleX(' + (S.flip ? -1 : 1) + ')'; $('flipLogo').setAttribute('aria-pressed', String(S.flip));
   $('blend').value = S.blend; $('tint').value = S.tint; $('tintColor').value = S.tintColor;
   $('tintColorField').hidden = S.tint !== 'custom'; $('satField').hidden = S.tint !== 'orig';
   if (document.activeElement !== $('suffix')) $('suffix').value = S.suffix;
@@ -572,11 +586,16 @@ function addFiles(files, sample = false) {
 /* cor e saturação: a logo é tratada uma vez e o resultado serve à prévia e à exportação */
 function prepLogo() {
   if (!logo) return;
-  if (S.tint === 'orig' && S.sat === 100) { logo.img = logo.src; return; }
+  const rot = ((S.rot % 4) + 4) % 4, odd = rot % 2 === 1;
+  logo.w = odd ? logo.nh : logo.nw; logo.h = odd ? logo.nw : logo.nh; logo.odd = odd;
+  if (S.tint === 'orig' && S.sat === 100 && !rot && !S.flip) { logo.img = logo.src; return; }
   const long = Math.max(logo.w, logo.h), svg = /^data:image\/svg/.test(logo.url);
   const sc = long > 2400 ? 2400 / long : (svg && long < 1600 ? 1600 / long : 1);
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(logo.w * sc)); c.height = Math.max(1, Math.round(logo.h * sc));
-  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(logo.src, 0, 0, c.width, c.height);
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+  const bw = odd ? c.height : c.width, bh = odd ? c.width : c.height;
+  x.translate(c.width / 2, c.height / 2); x.rotate(rot * Math.PI / 2); x.scale(S.flip ? -1 : 1, 1);
+  x.drawImage(logo.src, -bw / 2, -bh / 2, bw, bh); x.setTransform(1, 0, 0, 1, 0, 0);
   if (S.tint !== 'orig') {
     x.globalCompositeOperation = 'source-in';
     x.fillStyle = S.tint === 'white' ? '#fff' : S.tint === 'black' ? '#000' : S.tintColor;
@@ -596,7 +615,7 @@ function setLogoFromURL(url, name, sample) {
     const im = new Image();
     im.onload = () => {
       const w = im.naturalWidth || 600, h = im.naturalHeight || 200;
-      logo = {src: im, img: im, w, h, name, sample, url}; prepLogo();
+      logo = {src: im, img: im, w, h, nw: w, nh: h, name, sample, url}; prepLogo();
       $('logoImg').src = url; $('logoName').textContent = name + (sample ? ' (exemplo)' : '');
       syncUI(); draw(); res(true);
     };
@@ -624,6 +643,8 @@ $('prev').addEventListener('click', () => show(cur - 1));
 $('next').addEventListener('click', () => show(cur + 1));
 $('remove').addEventListener('click', () => { if (!items[cur]) return; items.splice(cur, 1); buildStrip(); show(cur); });
 $('addBtn').addEventListener('click', () => $('fileImgs').click());
+$('rotLogo').addEventListener('click', () => { S.rot = (S.rot + 1) % 4; prepLogo(); persist(); syncUI(); draw(); });
+$('flipLogo').addEventListener('click', () => { S.flip = !S.flip; prepLogo(); persist(); syncUI(); draw(); });
 $('pickLogo').addEventListener('click', () => $('fileLogo').click());
 $('fileImgs').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
 $('fileLogo').addEventListener('change', e => { if (e.target.files[0]) loadLogoFile(e.target.files[0]); e.target.value = ''; });
