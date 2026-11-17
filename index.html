@@ -58,12 +58,6 @@ footer{display:flex;flex-direction:column;align-items:center;gap:10px;padding-bl
 footer p{margin:0;font-size:12px}
 .foot-ig{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;color:var(--muted)}
 .foot-ig:hover{color:var(--accent)}
-.fold{border-top:1px solid var(--line);padding-top:12px}
-.fold summary{cursor:pointer;font-weight:500;list-style:none;display:flex;justify-content:space-between;align-items:center}
-.fold summary::-webkit-details-marker{display:none}
-.fold summary::after{content:"+";color:var(--muted);font-size:16px}
-.fold[open] summary::after{content:"\2013"}
-.fold[open] > *:not(summary){margin-top:12px}
 .modal{position:fixed;inset:0;z-index:50;background:rgba(8,10,14,.6);display:grid;place-items:center;padding:16px}
 .modal-card{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:16px;width:min(760px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}
 .modal-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
@@ -73,7 +67,6 @@ footer p{margin:0;font-size:12px}
 .cropwrap{display:grid;place-items:center;background:var(--stage);border-radius:6px;padding:12px;min-height:160px}
 .cropbox{position:relative;display:inline-block;max-width:100%;overflow:hidden;line-height:0;user-select:none;-webkit-user-drag:none}
 .cropbox img{display:block;max-width:100%;max-height:60vh;pointer-events:none}
-.sel{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55)}
 .sel i{position:absolute;width:18px;height:18px;transform:translate(-50%,-50%);background:#fff;border:1px solid #222;border-radius:50%;touch-action:none}
 .sel i[data-h=tl]{left:0;top:0;cursor:nwse-resize}
 .sel i[data-h=t]{left:50%;top:0;cursor:ns-resize}
@@ -83,6 +76,14 @@ footer p{margin:0;font-size:12px}
 .sel i[data-h=b]{left:50%;top:100%;cursor:ns-resize}
 .sel i[data-h=bl]{left:0;top:100%;cursor:nesw-resize}
 .sel i[data-h=l]{left:0;top:50%;cursor:ew-resize}
+.logoprev{position:relative;overflow:hidden;padding:0;border:0;cursor:pointer}
+.logoprev::after{content:"Editar";position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,18,24,.6);color:#fff;font:600 12px var(--body);opacity:0;transition:opacity .15s}
+.logoprev:hover::after,.logoprev:focus-visible::after{opacity:1}
+.shapes{display:flex;flex-wrap:wrap;gap:6px}
+.shapes button{font:inherit;font-size:13px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.shapes button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.cropsvg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.sel{position:absolute;border:1.5px dashed #fff}
 .bench{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
 @media (min-width:861px){.left{position:sticky;top:16px;align-self:start}}
 @media (max-width:860px){
@@ -228,7 +229,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
       <section>
         <h2>Logo</h2>
         <div class="logobox" id="logobox">
-          <div class="logoprev"><img id="logoImg" alt=""></div>
+          <button type="button" class="logoprev" id="logoEdit" title="Editar logo" aria-label="Editar logo: recorte e formato"><img id="logoImg" alt=""></button>
           <span class="logoname" id="logoName">—</span>
           <button class="btn sm ico" id="rotLogo" title="Girar 90°" aria-label="Girar a logo 90 graus">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13.2 2v3h-3"/></svg>
@@ -335,24 +336,6 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
             </div>
           </div>
         </div>
-        <details class="fold">
-          <summary>Recorte e formato</summary>
-          <div class="field">
-            <label for="shape">Formato</label>
-            <select id="shape">
-              <option value="none">Sem formato</option>
-              <option value="circle">Círculo</option>
-              <option value="square">Quadrado</option>
-              <option value="rounded">Quadrado arredondado</option>
-              <option value="triangle">Triângulo</option>
-              <option value="hex">Hexágono</option>
-            </select>
-          </div>
-          <div class="btnrow">
-            <button class="btn sm" id="cropOpen" type="button">Recortar bordas…</button>
-            <span class="hint" id="cropState"></span>
-          </div>
-        </details>
       </section>
 
       <section>
@@ -418,10 +401,12 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
 
 <div class="modal" id="cropModal" hidden role="dialog" aria-modal="true" aria-labelledby="cropTitle">
   <div class="modal-card">
-    <div class="modal-head"><h2 id="cropTitle">Recortar logo</h2><span class="hint">Arraste as alças para tirar as bordas que você não quer.</span></div>
+    <div class="modal-head"><h2 id="cropTitle">Editar logo</h2><span class="hint">Escolha um formato e arraste as alças para enquadrar a parte que fica.</span></div>
+    <div class="shapes" id="shapeChips" role="group" aria-label="Formato"></div>
     <div class="cropwrap">
-      <div class="cropbox">
+      <div class="cropbox" id="cropBox">
         <img id="cropImg" alt="">
+        <svg class="cropsvg" id="cropSvg" aria-hidden="true"></svg>
         <div class="sel" id="cropSel">
           <i data-h="tl"></i><i data-h="t"></i><i data-h="tr"></i><i data-h="r"></i>
           <i data-h="br"></i><i data-h="b"></i><i data-h="bl"></i><i data-h="l"></i>
@@ -613,7 +598,7 @@ function syncUI() {
   for (const k of ['size', 'margin', 'opacity', 'quality', 'sat', 'shadow', 'shBlur', 'shDist']) { $(k).value = S[k]; $(k + 'Out').textContent = fmtNum(S[k]) + '%'; }
   $('base').value = S.base; $('fmt').value = S.fmt; $('maxSide').value = S.maxSide;
   $('shadowOut').textContent = S.shadow ? S.shadow + '%' : 'Desligada'; $('shMore').hidden = !S.shadow; $('shColor').value = S.shColor; $('shHex').value = S.shHex; $('shHexField').hidden = S.shColor !== 'custom';
-  $('flipLogo').setAttribute('aria-pressed', String(S.flip)); $('shape').value = S.shape; $('cropState').textContent = cropped() ? 'Recorte aplicado' : '';
+  $('flipLogo').setAttribute('aria-pressed', String(S.flip)); 
   $('blend').value = S.blend; $('tint').value = S.tint; $('tintColor').value = S.tintColor;
   $('tintColorField').hidden = S.tint !== 'custom'; $('satField').hidden = S.tint !== 'orig';
   if (document.activeElement !== $('suffix')) $('suffix').value = S.suffix;
@@ -676,7 +661,6 @@ function addFiles(files, sample = false) {
 /* ---------- recorte e formato ---------- */
 const SQ = {square: 1}; /* só o quadrado recorta: vira um quadrado centralizado; os demais são máscaras sobre a área inteira */
 const frac = v => Math.max(0, Math.min(0.9, +v || 0));
-const cropped = () => !!(S.cL || S.cT || S.cR || S.cB);
 function cropRect(W, H) {
   const cl = frac(S.cL), ct = frac(S.cT);
   const cr = Math.min(frac(S.cR), 0.9 - cl), cb = Math.min(frac(S.cB), 0.9 - ct);
@@ -775,22 +759,59 @@ $('addBtn').addEventListener('click', () => $('fileImgs').click());
 $('dropEmpty').addEventListener('click', () => $('fileImgs').click());
 $('rotLogo').addEventListener('click', () => { S.rot = (S.rot + 1) % 4; prepLogo(); persist(); syncUI(); draw(); });
 $('flipLogo').addEventListener('click', () => { S.flip = !S.flip; prepLogo(); persist(); syncUI(); draw(); });
-/* recorte: a moldura é editada num rascunho e só vale quando você clica em Aplicar */
-let D = {cL: 0, cT: 0, cR: 0, cB: 0}, drag = null;
+/* ---------- editor da logo: recorte e formato numa caixa própria, aberta pela miniatura ---------- */
+const LOCK = {square: 1, rounded: 1, circle: 1}; /* formatos quadrados mantêm a moldura em 1:1 */
+const SHAPES = [['none', 'Livre'], ['circle', 'Círculo'], ['square', 'Quadrado'], ['rounded', 'Arredondado'], ['triangle', 'Triângulo'], ['hex', 'Hexágono']];
+let D = {cL: 0, cT: 0, cR: 0, cB: 0, shape: 'none'}, drag = null, BW = 1, BH = 1;
+const frameBox = () => ({x: D.cL * BW, y: D.cT * BH, w: (1 - D.cL - D.cR) * BW, h: (1 - D.cT - D.cB) * BH});
+function squareSet(side, cx, cy) {
+  side = Math.max(.05 * Math.min(BW, BH), Math.min(side, BW, BH));
+  let l = cx * BW - side / 2, t = cy * BH - side / 2;
+  l = Math.max(0, Math.min(l, BW - side)); t = Math.max(0, Math.min(t, BH - side));
+  D.cL = l / BW; D.cR = 1 - (l + side) / BW; D.cT = t / BH; D.cB = 1 - (t + side) / BH;
+}
+function shapeMarkup(x, y, w, h) {
+  if (D.shape === 'circle') return `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"/>`;
+  if (D.shape === 'rounded') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(w, h) * .2}"/>`;
+  if (D.shape === 'triangle') return `<polygon points="${x + w / 2},${y} ${x + w},${y + h} ${x},${y + h}"/>`;
+  if (D.shape === 'hex') return `<polygon points="${x + w / 2},${y} ${x + w},${y + h * .25} ${x + w},${y + h * .75} ${x + w / 2},${y + h} ${x},${y + h * .75} ${x},${y + h * .25}"/>`;
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+}
+function renderChips() { $('shapeChips').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === D.shape))); }
 function renderSel() {
-  const q = $('cropSel'); q.style.left = D.cL * 100 + '%'; q.style.top = D.cT * 100 + '%';
+  const box = $('cropBox'), W = box.offsetWidth, H = box.offsetHeight;
+  if (!W || !H) return;
+  const x = D.cL * W, y = D.cT * H, w = (1 - D.cL - D.cR) * W, h = (1 - D.cT - D.cB) * H;
+  const q = $('cropSel');
+  q.style.left = D.cL * 100 + '%'; q.style.top = D.cT * 100 + '%';
   q.style.width = (1 - D.cL - D.cR) * 100 + '%'; q.style.height = (1 - D.cT - D.cB) * 100 + '%';
+  const m = shapeMarkup(x, y, w, h), svg = $('cropSvg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `<defs><mask id="cropMk" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/><g fill="#000">${m}</g></mask></defs><rect width="${W}" height="${H}" fill="rgba(0,0,0,.55)" mask="url(#cropMk)"/><g fill="none" stroke="#fff" stroke-width="2">${m}</g>`;
+  renderChips();
 }
 function openCrop() {
   if (!logo || !logo.base) return;
-  const b = logo.base, k = Math.min(1, 900 / Math.max(b.width, b.height)), pv = document.createElement('canvas');
-  pv.width = Math.max(1, Math.round(b.width * k)); pv.height = Math.max(1, Math.round(b.height * k));
+  const b = logo.base; BW = b.width; BH = b.height;
+  const k = Math.min(1, 900 / Math.max(BW, BH)), pv = document.createElement('canvas');
+  pv.width = Math.max(1, Math.round(BW * k)); pv.height = Math.max(1, Math.round(BH * k));
   pv.getContext('2d').drawImage(b, 0, 0, pv.width, pv.height);
-  D = {cL: frac(S.cL), cT: frac(S.cT), cR: frac(S.cR), cB: frac(S.cB)};
-  $('cropImg').src = pv.toDataURL('image/png'); renderSel(); $('cropModal').hidden = false; $('cropOk').focus();
+  D = {cL: frac(S.cL), cT: frac(S.cT), cR: frac(S.cR), cB: frac(S.cB), shape: S.shape};
+  $('cropImg').src = pv.toDataURL('image/png');
+  $('cropModal').hidden = false; renderSel(); $('cropOk').focus();
 }
 function closeCrop() { $('cropModal').hidden = true; drag = null; }
 $('cropImg').addEventListener('load', renderSel);
+window.addEventListener('resize', () => { if (!$('cropModal').hidden) renderSel(); });
+SHAPES.forEach(([s, label]) => {
+  const b = document.createElement('button'); b.type = 'button'; b.dataset.s = s; b.textContent = label;
+  b.addEventListener('click', () => {
+    D.shape = s;
+    if (LOCK[s]) { const f = frameBox(); squareSet(Math.min(f.w, f.h), (f.x + f.w / 2) / BW, (f.y + f.h / 2) / BH); }
+    renderSel();
+  });
+  $('shapeChips').appendChild(b);
+});
 document.querySelectorAll('#cropSel i').forEach(h => {
   h.addEventListener('pointerdown', e => { e.preventDefault(); h.setPointerCapture(e.pointerId); drag = {h: h.dataset.h, x: e.clientX, y: e.clientY, s: {...D}}; });
   h.addEventListener('pointermove', e => {
@@ -800,20 +821,24 @@ document.querySelectorAll('#cropSel i').forEach(h => {
     if (k.includes('r')) D.cR = Math.max(0, Math.min(s.cR - dx, 1 - s.cL - M));
     if (k.includes('t')) D.cT = Math.max(0, Math.min(s.cT + dy, 1 - s.cB - M));
     if (k.includes('b')) D.cB = Math.max(0, Math.min(s.cB - dy, 1 - s.cT - M));
+    if (LOCK[D.shape]) {
+      const f = frameBox(), side = k.length === 1 ? (k === 'l' || k === 'r' ? f.w : f.h) : Math.max(f.w, f.h);
+      squareSet(side, (f.x + f.w / 2) / BW, (f.y + f.h / 2) / BH);
+    }
     renderSel();
   });
   const end = () => { drag = null; };
   h.addEventListener('pointerup', end); h.addEventListener('pointercancel', end);
 });
-$('cropOpen').addEventListener('click', openCrop);
-$('cropReset').addEventListener('click', () => { D = {cL: 0, cT: 0, cR: 0, cB: 0}; renderSel(); });
+$('logoEdit').addEventListener('click', openCrop);
+$('cropReset').addEventListener('click', () => { D = {cL: 0, cT: 0, cR: 0, cB: 0, shape: 'none'}; renderSel(); });
 $('cropCancel').addEventListener('click', closeCrop);
 $('cropModal').addEventListener('click', e => { if (e.target === $('cropModal')) closeCrop(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cropModal').hidden) closeCrop(); });
 $('cropOk').addEventListener('click', () => {
-  Object.assign(S, {cL: D.cL, cT: D.cT, cR: D.cR, cB: D.cB}); closeCrop(); prepLogo(); persist(); syncUI(); draw();
+  Object.assign(S, {cL: D.cL, cT: D.cT, cR: D.cR, cB: D.cB, shape: D.shape});
+  closeCrop(); prepLogo(); persist(); syncUI(); draw();
 });
-$('shape').addEventListener('change', e => { S.shape = e.target.value; prepLogo(); persist(); syncUI(); draw(); });
 $('pickLogo').addEventListener('click', () => $('fileLogo').click());
 $('fileImgs').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
 $('fileLogo').addEventListener('change', e => { if (e.target.files[0]) loadLogoFile(e.target.files[0]); e.target.value = ''; });
