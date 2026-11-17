@@ -109,6 +109,15 @@ footer p{margin:0;font-size:12px}
 .mk.bl{bottom:-16px;left:-16px;border-right-width:1px;border-top-width:1px}
 .mk.br{bottom:-16px;right:-16px;border-left-width:1px;border-top-width:1px}
 .hint{color:var(--muted);font-size:12.5px;margin:0}
+.pentools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.swatches{display:flex;gap:6px}
+.swatches button{width:22px;height:22px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}
+.swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent)}
+.pentools input[type=color]{width:28px;height:28px;padding:1px;border:1px solid var(--line);border-radius:50%;background:transparent;cursor:pointer}
+.penw{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px;font-weight:400}
+.penw input{width:110px}
+.frame canvas.pen{cursor:crosshair}
+.btn.ico.has{color:var(--accent)}
 .drop{flex:1;min-height:240px;display:grid;place-content:center;gap:6px;text-align:center;border:1.5px dashed var(--muted);border-radius:6px;background:transparent;color:var(--muted);font:inherit;cursor:pointer}
 .drop b{color:var(--ink);font-size:16px;font-weight:600}
 .drop:hover,body.over .drop{border-color:var(--accent);color:var(--accent)}
@@ -190,7 +199,19 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
         <button class="btn sm" id="next" aria-label="Próxima foto">›</button>
         <span class="info" id="info">Carregando…</span>
         <span class="chip" id="sampleChip" hidden>exemplo</span>
+        <button class="btn sm ico" id="penBtn" type="button" title="Lápis: riscar na foto" aria-label="Lápis: riscar na foto" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5l.6-3L11 2.6a1.4 1.4 0 0 1 2 0l.4.4a1.4 1.4 0 0 1 0 2L5.5 12.9z"/><path d="M9.8 3.8l2.4 2.4"/></svg>
+        </button>
         <button class="btn sm" id="remove">Remover foto</button>
+      </div>
+      <div class="pentools" id="penTools" hidden>
+        <span class="swatches" id="penSwatches" role="group" aria-label="Cor do lápis"></span>
+        <input type="color" id="penColor" aria-label="Outra cor" title="Outra cor">
+        <label class="penw"><span>Espessura</span><input type="range" id="penSize" min="2" max="40" step="1"></label>
+        <span class="grow"></span>
+        <button class="btn sm" id="penUndo" type="button">Desfazer</button>
+        <button class="btn sm" id="penClear" type="button">Limpar</button>
+        <button class="btn sm" id="penDone" type="button">Concluir</button>
       </div>
 
       <div class="stage" id="stage">
@@ -200,7 +221,7 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
           <canvas id="cv" width="600" height="400" tabindex="0" aria-label="Prévia da foto com a logo. Arraste a logo ou use as setas do teclado para mover."></canvas>
         </div>
       </div>
-      <p class="hint">Arraste a logo na prévia, ou clique onde ela deve ficar. Setas do teclado movem 1% (Shift: 5%). Ela gruda nas bordas e no centro.</p>
+      <p class="hint" id="hint">Arraste a logo na prévia, ou clique onde ela deve ficar. Setas do teclado movem 1% (Shift: 5%). Ela gruda nas bordas e no centro.</p>
 
       <div class="striprow">
         <button type="button" class="add" id="addBtn">+ Adicionar fotos</button>
@@ -495,7 +516,7 @@ let guides = null;
 function fitCanvas() {
   const it = items[cur]; if (!it || !curBmp) return;
   const stage = $('stage'), availW = Math.max(stage.clientWidth - 56, 120);
-  const availH = Math.max(Math.min(window.innerHeight * 0.62, 640, window.innerHeight - 270), 220);
+  const availH = Math.max(Math.min(window.innerHeight * 0.62, 640, window.innerHeight - 270 - (pen && pen.on ? 56 : 0)), 220);
   const s = Math.min(availW / curBmp.width, availH / curBmp.height, 1);
   const cw = Math.round(curBmp.width * s), ch = Math.round(curBmp.height * s);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -510,6 +531,7 @@ function draw() {
   const it = items[cur];
   if (!it || !curBmp || !baseCv) { ctx.clearRect(0, 0, cv.width, cv.height); return; }
   ctx.drawImage(baseCv, 0, 0);
+  drawMarks(ctx, cv.width, cv.height, it.marks);
   const k = cv.width / curBmp.width;
   stamp(ctx, curBmp.width, curBmp.height, posOf(it), k);
   if (guides && logo) {
@@ -561,16 +583,82 @@ function dragTo(e) {
   guides = {x: x === .5, y: y === .5};
   setPos(x, y);
 }
+/* ---------- lápis: riscos na foto de fundo, por baixo da logo, guardados por foto ---------- */
+var pen = {on: false, color: '#e11d48', size: 8}, HINT = $('hint').textContent;
+const PENK = LS + '.pen', SWATCH = ['#e11d48', '#facc15', '#ffffff', '#111111', '#2563eb', '#16a34a'];
+try { const q = JSON.parse(localStorage.getItem(PENK) || '{}'); if (/^#[0-9a-f]{6}$/i.test(q.color)) pen.color = q.color; if (q.size >= 2 && q.size <= 40) pen.size = +q.size; } catch {}
+const savePen = () => { try { localStorage.setItem(PENK, JSON.stringify({color: pen.color, size: pen.size})); } catch {} };
+let stroke = null, penRaf = 0;
+function drawMarks(c, W, H, marks) {
+  if (!marks || !marks.length) return;
+  const m = Math.min(W, H);
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const s of marks) {
+    const p = s.pts; c.strokeStyle = s.color; c.fillStyle = s.color; c.lineWidth = Math.max(1, s.w * m);
+    if (p.length === 1) { c.beginPath(); c.arc(p[0][0] * W, p[0][1] * H, c.lineWidth / 2, 0, Math.PI * 2); c.fill(); continue; }
+    c.beginPath(); c.moveTo(p[0][0] * W, p[0][1] * H);
+    for (let i = 1; i < p.length - 1; i++) c.quadraticCurveTo(p[i][0] * W, p[i][1] * H, (p[i][0] + p[i + 1][0]) / 2 * W, (p[i][1] + p[i + 1][1]) / 2 * H);
+    const l = p[p.length - 1]; c.lineTo(l[0] * W, l[1] * H); c.stroke();
+  }
+  c.restore();
+}
+const normPt = (ev, r) => [Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height))];
+function penStart(e) {
+  const it = items[cur]; if (!it || it.err) return;
+  (it.marks = it.marks || []).push(stroke = {color: pen.color, w: pen.size / 1000, pts: [normPt(e, cv.getBoundingClientRect())]});
+  cv.setPointerCapture(e.pointerId); draw(); syncPen();
+}
+function penMove(e) {
+  const r = cv.getBoundingClientRect(), evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+  for (const ev of (evs.length ? evs : [e])) stroke.pts.push(normPt(ev, r));
+  if (!penRaf) penRaf = requestAnimationFrame(() => { penRaf = 0; draw(); });
+}
+function penEnd() { if (!stroke) return; stroke = null; draw(); syncPen(); }
+function syncPen() {
+  if (!pen) return;
+  const it = items[cur], n = it && it.marks ? it.marks.length : 0;
+  $('penBtn').disabled = !it || !!it.err; $('penBtn').setAttribute('aria-pressed', String(pen.on)); $('penBtn').classList.toggle('has', n > 0);
+  $('penTools').hidden = !pen.on; $('penUndo').disabled = !n; $('penClear').disabled = !n;
+  cv.classList.toggle('pen', pen.on);
+  $('penColor').value = pen.color; $('penSize').value = pen.size;
+  $('penSwatches').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === pen.color)));
+  $('hint').textContent = pen.on ? 'Desenhe na foto. Os riscos ficam por baixo da logo e saem na exportação. Ctrl+Z desfaz.' : HINT;
+  const c = $('penClear'); if (!n) { delete c.dataset.arm; c.textContent = 'Limpar'; }
+}
+SWATCH.forEach(col => {
+  const b = document.createElement('button'); b.type = 'button'; b.dataset.c = col; b.style.background = col; b.title = 'Cor ' + col; b.setAttribute('aria-label', 'Cor ' + col);
+  b.addEventListener('click', () => { pen.color = col; savePen(); syncPen(); });
+  $('penSwatches').appendChild(b);
+});
+const setPenMode = on => { pen.on = on; stroke = null; syncPen(); fitCanvas(); };
+$('penBtn').addEventListener('click', () => setPenMode(!pen.on));
+$('penDone').addEventListener('click', () => setPenMode(false));
+$('penColor').addEventListener('input', e => { pen.color = e.target.value; savePen(); syncPen(); });
+$('penSize').addEventListener('input', e => { pen.size = +e.target.value; savePen(); });
+function penUndo() { const it = items[cur]; if (!it || !it.marks || !it.marks.length) return; it.marks.pop(); draw(); syncPen(); }
+$('penUndo').addEventListener('click', penUndo);
+$('penClear').addEventListener('click', e => {
+  const b = e.currentTarget, it = items[cur]; if (!it) return;
+  if (!b.dataset.arm) { b.dataset.arm = '1'; b.textContent = 'Confirmar limpar'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Limpar'; }, 4000); return; }
+  delete b.dataset.arm; b.textContent = 'Limpar'; it.marks = []; draw(); syncPen();
+});
+document.addEventListener('keydown', e => {
+  if (!pen.on || !$('cropModal').hidden) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); penUndo(); }
+  else if (e.key === 'Escape') setPenMode(false);
+});
 cv.addEventListener('pointerdown', e => {
-  if (!curBmp || !logo) return;
+  if (!curBmp) return;
+  if (pen.on) { penStart(e); return; }
+  if (!logo) return;
   const p = toImg(e), r = logoRect(curBmp.width, curBmp.height, posOf(items[cur]));
   const inside = p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
   grab = inside ? {dx: p.x - r.x, dy: p.y - r.y} : {dx: r.w / 2, dy: r.h / 2};
   cv.setPointerCapture(e.pointerId); cv.classList.add('drag'); dragTo(e);
 });
-cv.addEventListener('pointermove', e => { if (grab) dragTo(e); });
+cv.addEventListener('pointermove', e => { if (stroke) penMove(e); else if (grab) dragTo(e); });
 const endDrag = () => { if (!grab) return; grab = null; guides = null; cv.classList.remove('drag'); draw(); };
-cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('pointerup', () => { penEnd(); endDrag(); }); cv.addEventListener('pointercancel', () => { penEnd(); endDrag(); });
 cv.addEventListener('keydown', e => {
   const d = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[e.key];
   if (!d || !items[cur]) return;
@@ -619,7 +707,7 @@ function syncUI() {
     t.setAttribute('aria-current', String(i === cur));
     const dot = t.querySelector('.own'); if (dot) dot.hidden = !items[i].own;
   });
-  syncAnchors();
+  syncAnchors(); syncPen();
 }
 function buildStrip() {
   const strip = $('strip'); strip.textContent = '';
@@ -889,6 +977,7 @@ async function renderOut(it, bmpIn) {
     const t = outType(it);
     if (t.ext === 'jpg') { x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
     x.drawImage(bmp, 0, 0, W, H);
+    drawMarks(x, W, H, it.marks);
     stamp(x, W, H, posOf(it));
     const blob = await new Promise(r => c.toBlob(r, t.mime, S.quality / 100));
     c.width = c.height = 0;
