@@ -199,6 +199,9 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
         <button class="btn sm" id="next" aria-label="Próxima foto">›</button>
         <span class="info" id="info">Carregando…</span>
         <span class="chip" id="sampleChip" hidden>exemplo</span>
+        <button class="btn sm ico" id="rotPhoto" type="button" title="Girar foto 90°" aria-label="Girar a foto 90 graus">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-4"/><path d="M13.6 2.2v3h-3"/></svg>
+        </button>
         <button class="btn sm ico" id="penBtn" type="button" title="Lápis: riscar na foto" aria-label="Lápis: riscar na foto" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5l.6-3L11 2.6a1.4 1.4 0 0 1 2 0l.4.4a1.4 1.4 0 0 1 0 2L5.5 12.9z"/><path d="M9.8 3.8l2.4 2.4"/></svg>
         </button>
@@ -453,7 +456,7 @@ const LS = 'carimbo.v1';
 const S = {size:18, base:'min', margin:4, opacity:100, x:1, y:1, fmt:'jpg', quality:90, maxSide:'0', suffix:'-logo', blend:'source-over', tint:'orig', tintColor:'#e4002b', sat:100, shadow:0, shBlur:15, shDist:4, shColor:'black', shHex:'#1e3a8a', rot:0, flip:false, cL:0, cT:0, cR:0, cB:0, shape:'none'};
 const DEF = {...S};
 const clean = o => { const r = {}; for (const k in DEF) if (o && typeof o[k] === typeof DEF[k]) r[k] = o[k]; return r; };
-let items = [], cur = 0, curBmp = null, curFor = null, baseCv = null, logo = null, busy = false, uid = 0;
+let items = [], cur = 0, curBmp = null, curRaw = null, curFor = null, baseCv = null, logo = null, busy = false, uid = 0;
 const cv = $('cv'), ctx = cv.getContext('2d');
 
 try { Object.assign(S, clean(JSON.parse(localStorage.getItem(LS) || '{}'))); } catch {}
@@ -504,11 +507,28 @@ function decode(file) {
   const run = async () => { try { return await createImageBitmap(file); } catch { return await viaImg(file); } };
   const p = decQ.then(run, run); decQ = p.catch(() => {}); return p;
 }
+/* girar a foto: a foto aberta é girada uma vez e todo o resto (prévia, miniatura, exportação) usa o resultado */
+function rotBmp(src, rot) {
+  rot = ((rot || 0) % 4 + 4) % 4; if (!rot) return src;
+  const odd = rot % 2 === 1, c = document.createElement('canvas');
+  c.width = odd ? src.height : src.width; c.height = odd ? src.width : src.height;
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+  x.translate(c.width / 2, c.height / 2); x.rotate(rot * Math.PI / 2);
+  x.drawImage(src, -src.width / 2, -src.height / 2);
+  return c;
+}
+function freeCur() {
+  if (curBmp && curBmp !== curRaw && curBmp.close) curBmp.close();
+  if (curRaw && curRaw.close) curRaw.close();
+  curBmp = curRaw = null; curFor = null;
+}
 function makeThumb(it, bmp) {
   const c = document.createElement('canvas'); c.height = 120; c.width = Math.max(1, Math.round(120 * bmp.width / bmp.height));
   const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(bmp, 0, 0, c.width, c.height);
   it.thumb = c.toDataURL('image/jpeg', .7);
-  if (it.el && items.includes(it) && !it.el.querySelector('img')) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; it.el.prepend(im); }
+  const old = it.el && it.el.querySelector('img');
+  if (old) old.src = it.thumb;
+  else if (it.el && items.includes(it)) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; it.el.prepend(im); }
 }
 
 /* ---------- prévia ---------- */
@@ -549,15 +569,15 @@ async function show(i) {
   cur = Math.max(0, Math.min(i, items.length - 1));
   const it = items[cur];
   syncUI();
-  if (!it) { if (curBmp && curBmp.close) curBmp.close(); curBmp = null; curFor = null; cv.style.width = '300px'; cv.style.height = '200px'; cv.width = 300; cv.height = 200; draw(); return; }
+  if (!it) { freeCur(); cv.style.width = '300px'; cv.style.height = '200px'; cv.width = 300; cv.height = 200; draw(); return; }
   if (curFor !== it.id) {
     const wasErr = it.err; it.err = false;
-    if (curBmp && curBmp.close) curBmp.close(); curBmp = null; curFor = null; /* libera a foto anterior antes de abrir a próxima */
+    freeCur(); /* libera a foto anterior antes de abrir a próxima */
     try {
       const bmp = await decode(it.file);
       if (items[cur] !== it) { bmp.close && bmp.close(); return; }
-      curBmp = bmp; curFor = it.id; it.w = bmp.width; it.h = bmp.height;
-      if (!it.thumb) makeThumb(it, bmp);
+      curRaw = bmp; curBmp = rotBmp(bmp, it.rot); curFor = it.id; it.w = curBmp.width; it.h = curBmp.height;
+      if (!it.thumb) makeThumb(it, curBmp);
       if (wasErr) buildStrip();
     } catch { it.err = true; if (!wasErr) buildStrip(); }
   }
@@ -617,6 +637,7 @@ function penEnd() { if (!stroke) return; stroke = null; draw(); syncPen(); }
 function syncPen() {
   if (!pen) return;
   const it = items[cur], n = it && it.marks ? it.marks.length : 0;
+  $('rotPhoto').disabled = !it || !!it.err;
   $('penBtn').disabled = !it || !!it.err; $('penBtn').setAttribute('aria-pressed', String(pen.on)); $('penBtn').classList.toggle('has', n > 0);
   $('penTools').hidden = !pen.on; $('penUndo').disabled = !n; $('penClear').disabled = !n;
   cv.classList.toggle('pen', pen.on);
@@ -632,6 +653,16 @@ SWATCH.forEach(col => {
 });
 const setPenMode = on => { pen.on = on; stroke = null; syncPen(); fitCanvas(); };
 $('penBtn').addEventListener('click', () => setPenMode(!pen.on));
+$('rotPhoto').addEventListener('click', () => {
+  const it = items[cur]; if (!it || it.err || !curBmp || !curRaw || stroke) return;
+  it.rot = ((it.rot || 0) + 1) % 4;
+  /* riscos e posição própria da logo acompanham o giro de 90° para a direita: (x, y) vira (1 - y, x) */
+  if (it.marks) for (const m of it.marks) m.pts = m.pts.map(([x, y]) => [1 - y, x]);
+  if (it.own) it.own = {x: 1 - it.own.y, y: it.own.x};
+  if (curBmp !== curRaw && curBmp.close) curBmp.close();
+  curBmp = rotBmp(curRaw, it.rot); it.w = curBmp.width; it.h = curBmp.height;
+  makeThumb(it, curBmp); syncUI(); fitCanvas();
+});
 $('penDone').addEventListener('click', () => setPenMode(false));
 $('penColor').addEventListener('input', e => { pen.color = e.target.value; savePen(); syncPen(); });
 $('penSize').addEventListener('input', e => { pen.size = +e.target.value; savePen(); });
@@ -729,9 +760,9 @@ async function thumbQueue() {
   for (;;) {
     const it = items.find(x => !x.thumb && !x.err && x !== items[cur]); if (!it) break;
     try {
-      const bmp = await decode(it.file);
-      it.w = bmp.width; it.h = bmp.height;
-      if (!it.thumb) makeThumb(it, bmp);
+      const bmp = await decode(it.file), o = rotBmp(bmp, it.rot);
+      it.w = o.width; it.h = o.height;
+      if (!it.thumb) makeThumb(it, o);
       bmp.close && bmp.close();
     } catch { it.err = true; if (it.el) { it.el.classList.add('err'); it.el.prepend('erro'); } syncUI(); }
   }
@@ -967,7 +998,7 @@ function outType(it) {
   return {ext: f, mime: f === 'jpg' ? 'image/jpeg' : 'image/' + f};
 }
 async function renderOut(it, bmpIn) {
-  const bmp = bmpIn || await decode(it.file);
+  const raw = bmpIn ? null : await decode(it.file), bmp = bmpIn || rotBmp(raw, it.rot);
   try {
     const max = +S.maxSide, long = Math.max(bmp.width, bmp.height);
     const s = max && long > max ? max / long : 1;
@@ -983,7 +1014,7 @@ async function renderOut(it, bmpIn) {
     c.width = c.height = 0;
     if (!blob) throw new Error('toBlob');
     return {blob, ext: blob.type === t.mime ? t.ext : 'png'};
-  } finally { if (!bmpIn && bmp.close) bmp.close(); }
+  } finally { if (raw && raw.close) raw.close(); }
 }
 /* .zip sem compressão (as fotos já são comprimidas), montado aqui mesmo */
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -1183,7 +1214,7 @@ $('resetAll').addEventListener('click', async e => {
   Object.assign(S, DEF); clearTimeout(saveT);
   try { localStorage.removeItem(LS); localStorage.removeItem(LS + '.logo'); } catch {}
   curP = ''; fillPresets(); $('pNameRow').hidden = true;
-  items = []; if (curBmp && curBmp.close) curBmp.close(); curBmp = null; curFor = null; cur = 0; buildStrip();
+  items = []; freeCur(); cur = 0; buildStrip();
   await setLogoFromURL(sampleLogo(), 'sua-logo.png', true);
   addFiles(await samplePhotos(), true);
   setStatus('Tudo voltou ao padrão inicial.' + (presets.length ? ' Suas predefinições salvas foram mantidas.' : ''), 'ok');
