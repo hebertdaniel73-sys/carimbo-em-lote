@@ -205,6 +205,9 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
         <button class="btn sm ico" id="flipPhoto" type="button" title="Espelhar foto" aria-label="Espelhar a foto" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5v13" stroke-dasharray="2 2"/><path d="M6 4 1.5 12H6z"/><path d="M10 4l4.5 8H10z" fill="currentColor"/></svg>
         </button>
+        <button class="btn sm ico" id="seamPhoto" type="button" title="Mosaico perfeito: tira as emendas para a foto poder ser repetida lado a lado" aria-label="Mosaico perfeito, sem emendas" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>
+        </button>
         <button class="btn sm ico" id="penBtn" type="button" title="Lápis: riscar na foto" aria-label="Lápis: riscar na foto" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5l.6-3L11 2.6a1.4 1.4 0 0 1 2 0l.4.4a1.4 1.4 0 0 1 0 2L5.5 12.9z"/><path d="M9.8 3.8l2.4 2.4"/></svg>
         </button>
@@ -520,6 +523,32 @@ function rotBmp(src, rot, flip) {
   x.drawImage(src, -src.width / 2, -src.height / 2);
   return c;
 }
+/* mosaico perfeito (como no GIMP): mistura a foto com ela mesma deslocada pela metade; nas bordas só aparece a parte deslocada,
+   então a borda direita continua exatamente onde a esquerda começa, e a foto pode ser repetida lado a lado sem emenda */
+function seamless(src) {
+  const W = src.width, H = src.height;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(src, 0, 0);
+  const img = x.getImageData(0, 0, W, H), a = img.data, out = x.createImageData(W, H), d = out.data;
+  const ramp = n => { const r = new Float32Array(n); for (let i = 0; i < n; i++) { const u = n > 1 ? i / (n - 1) : .5, t = Math.min(1, Math.min(u, 1 - u) / .3); r[i] = t * t * (3 - 2 * t); } return r; };
+  const wx = ramp(W), wy = ramp(H), W2 = W >> 1, H2 = H >> 1;
+  for (let y = 0; y < H; y++) {
+    const sy = (y + H2) % H * W, wv = wy[y], row = y * W;
+    for (let px = 0; px < W; px++) {
+      const w = wx[px] * wv, v = 1 - w, i = (row + px) * 4, j = (sy + (px + W2) % W) * 4;
+      d[i] = a[i] * w + a[j] * v; d[i + 1] = a[i + 1] * w + a[j + 1] * v; d[i + 2] = a[i + 2] * w + a[j + 2] * v; d[i + 3] = a[i + 3] * w + a[j + 3] * v;
+    }
+  }
+  x.putImageData(out, 0, 0);
+  return c;
+}
+/* a foto aberta passa por: girar/espelhar e, se pedido, mosaico perfeito; prévia, miniatura e exportação usam o resultado */
+function prepPhoto(raw, it) {
+  const r = rotBmp(raw, it.rot, it.flip);
+  if (!it.seam) return r;
+  try { return seamless(r); }
+  catch { it.seam = false; setStatus('Esta foto é grande demais para o mosaico perfeito neste aparelho.', 'bad'); return r; }
+}
 function freeCur() {
   if (curBmp && curBmp !== curRaw && curBmp.close) curBmp.close();
   if (curRaw && curRaw.close) curRaw.close();
@@ -579,7 +608,7 @@ async function show(i) {
     try {
       const bmp = await decode(it.file);
       if (items[cur] !== it) { bmp.close && bmp.close(); return; }
-      curRaw = bmp; curBmp = rotBmp(bmp, it.rot, it.flip); curFor = it.id; it.w = curBmp.width; it.h = curBmp.height;
+      curRaw = bmp; curBmp = prepPhoto(bmp, it); curFor = it.id; it.w = curBmp.width; it.h = curBmp.height;
       if (!it.thumb) makeThumb(it, curBmp);
       if (wasErr) buildStrip();
     } catch { it.err = true; if (!wasErr) buildStrip(); }
@@ -640,7 +669,8 @@ function penEnd() { if (!stroke) return; stroke = null; draw(); syncPen(); }
 function syncPen() {
   if (!pen) return;
   const it = items[cur], n = it && it.marks ? it.marks.length : 0;
-  $('rotPhoto').disabled = $('flipPhoto').disabled = !it || !!it.err;
+  $('rotPhoto').disabled = $('flipPhoto').disabled = $('seamPhoto').disabled = !it || !!it.err;
+  $('seamPhoto').setAttribute('aria-pressed', String(!!(it && it.seam)));
   $('flipPhoto').setAttribute('aria-pressed', String(!!(it && it.flip)));
   $('penBtn').disabled = !it || !!it.err; $('penBtn').setAttribute('aria-pressed', String(pen.on)); $('penBtn').classList.toggle('has', n > 0);
   $('penTools').hidden = !pen.on; $('penUndo').disabled = !n; $('penClear').disabled = !n;
@@ -674,9 +704,18 @@ $('flipPhoto').addEventListener('click', () => {
   if (it.own) it.own = {x: 1 - it.own.x, y: it.own.y};
   reorient(it);
 });
+$('seamPhoto').addEventListener('click', async () => {
+  const it = items[cur]; if (!it || it.err || !curBmp || !curRaw || stroke || busy) return;
+  it.seam = !it.seam; $('seamPhoto').disabled = true;
+  setStatus(it.seam ? 'Aplicando o mosaico perfeito…' : '');
+  await new Promise(r => setTimeout(r, 30));
+  if (items[cur] !== it) return;
+  reorient(it);
+  if (it.seam) setStatus('Mosaico perfeito aplicado: a foto agora pode ser repetida sem emendas. Clique de novo no ícone para desfazer.', 'ok');
+});
 function reorient(it) {
   if (curBmp !== curRaw && curBmp.close) curBmp.close();
-  curBmp = rotBmp(curRaw, it.rot, it.flip); it.w = curBmp.width; it.h = curBmp.height;
+  curBmp = prepPhoto(curRaw, it); it.w = curBmp.width; it.h = curBmp.height;
   makeThumb(it, curBmp); syncUI(); fitCanvas();
 }
 $('penDone').addEventListener('click', () => setPenMode(false));
@@ -776,7 +815,7 @@ async function thumbQueue() {
   for (;;) {
     const it = items.find(x => !x.thumb && !x.err && x !== items[cur]); if (!it) break;
     try {
-      const bmp = await decode(it.file), o = rotBmp(bmp, it.rot, it.flip);
+      const bmp = await decode(it.file), o = prepPhoto(bmp, it);
       it.w = o.width; it.h = o.height;
       if (!it.thumb) makeThumb(it, o);
       bmp.close && bmp.close();
@@ -1014,7 +1053,7 @@ function outType(it) {
   return {ext: f, mime: f === 'jpg' ? 'image/jpeg' : 'image/' + f};
 }
 async function renderOut(it, bmpIn) {
-  const raw = bmpIn ? null : await decode(it.file), bmp = bmpIn || rotBmp(raw, it.rot, it.flip);
+  const raw = bmpIn ? null : await decode(it.file), bmp = bmpIn || prepPhoto(raw, it);
   try {
     const max = +S.maxSide, long = Math.max(bmp.width, bmp.height);
     const s = max && long > max ? max / long : 1;
@@ -1030,7 +1069,7 @@ async function renderOut(it, bmpIn) {
     c.width = c.height = 0;
     if (!blob) throw new Error('toBlob');
     return {blob, ext: blob.type === t.mime ? t.ext : 'png'};
-  } finally { if (raw && raw.close) raw.close(); }
+  } finally { if (raw && raw.close) raw.close(); if (!bmpIn && bmp !== raw && bmp.getContext) bmp.width = bmp.height = 0; }
 }
 /* .zip sem compressão (as fotos já são comprimidas), montado aqui mesmo */
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
