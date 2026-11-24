@@ -202,6 +202,9 @@ body.over .stage{outline:2px dashed var(--accent);outline-offset:-6px}
         <button class="btn sm ico" id="rotPhoto" type="button" title="Girar foto 90°" aria-label="Girar a foto 90 graus">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-4"/><path d="M13.6 2.2v3h-3"/></svg>
         </button>
+        <button class="btn sm ico" id="flipPhoto" type="button" title="Espelhar foto" aria-label="Espelhar a foto" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5v13" stroke-dasharray="2 2"/><path d="M6 4 1.5 12H6z"/><path d="M10 4l4.5 8H10z" fill="currentColor"/></svg>
+        </button>
         <button class="btn sm ico" id="penBtn" type="button" title="Lápis: riscar na foto" aria-label="Lápis: riscar na foto" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5l.6-3L11 2.6a1.4 1.4 0 0 1 2 0l.4.4a1.4 1.4 0 0 1 0 2L5.5 12.9z"/><path d="M9.8 3.8l2.4 2.4"/></svg>
         </button>
@@ -508,12 +511,12 @@ function decode(file) {
   const p = decQ.then(run, run); decQ = p.catch(() => {}); return p;
 }
 /* girar a foto: a foto aberta é girada uma vez e todo o resto (prévia, miniatura, exportação) usa o resultado */
-function rotBmp(src, rot) {
-  rot = ((rot || 0) % 4 + 4) % 4; if (!rot) return src;
+function rotBmp(src, rot, flip) {
+  rot = ((rot || 0) % 4 + 4) % 4; if (!rot && !flip) return src;
   const odd = rot % 2 === 1, c = document.createElement('canvas');
   c.width = odd ? src.height : src.width; c.height = odd ? src.width : src.height;
   const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
-  x.translate(c.width / 2, c.height / 2); x.rotate(rot * Math.PI / 2);
+  x.translate(c.width / 2, c.height / 2); if (flip) x.scale(-1, 1); x.rotate(rot * Math.PI / 2); /* gira e depois espelha */
   x.drawImage(src, -src.width / 2, -src.height / 2);
   return c;
 }
@@ -576,7 +579,7 @@ async function show(i) {
     try {
       const bmp = await decode(it.file);
       if (items[cur] !== it) { bmp.close && bmp.close(); return; }
-      curRaw = bmp; curBmp = rotBmp(bmp, it.rot); curFor = it.id; it.w = curBmp.width; it.h = curBmp.height;
+      curRaw = bmp; curBmp = rotBmp(bmp, it.rot, it.flip); curFor = it.id; it.w = curBmp.width; it.h = curBmp.height;
       if (!it.thumb) makeThumb(it, curBmp);
       if (wasErr) buildStrip();
     } catch { it.err = true; if (!wasErr) buildStrip(); }
@@ -637,7 +640,8 @@ function penEnd() { if (!stroke) return; stroke = null; draw(); syncPen(); }
 function syncPen() {
   if (!pen) return;
   const it = items[cur], n = it && it.marks ? it.marks.length : 0;
-  $('rotPhoto').disabled = !it || !!it.err;
+  $('rotPhoto').disabled = $('flipPhoto').disabled = !it || !!it.err;
+  $('flipPhoto').setAttribute('aria-pressed', String(!!(it && it.flip)));
   $('penBtn').disabled = !it || !!it.err; $('penBtn').setAttribute('aria-pressed', String(pen.on)); $('penBtn').classList.toggle('has', n > 0);
   $('penTools').hidden = !pen.on; $('penUndo').disabled = !n; $('penClear').disabled = !n;
   cv.classList.toggle('pen', pen.on);
@@ -655,14 +659,26 @@ const setPenMode = on => { pen.on = on; stroke = null; syncPen(); fitCanvas(); }
 $('penBtn').addEventListener('click', () => setPenMode(!pen.on));
 $('rotPhoto').addEventListener('click', () => {
   const it = items[cur]; if (!it || it.err || !curBmp || !curRaw || stroke) return;
-  it.rot = ((it.rot || 0) + 1) % 4;
-  /* riscos e posição própria da logo acompanham o giro de 90° para a direita: (x, y) vira (1 - y, x) */
+  /* girar 90° para a direita; com a foto espelhada, o mesmo giro "visto na tela" volta um passo no giro interno */
+  it.rot = ((it.rot || 0) + (it.flip ? 3 : 1)) % 4;
+  /* riscos e posição própria da logo acompanham: (x, y) vira (1 - y, x) */
   if (it.marks) for (const m of it.marks) m.pts = m.pts.map(([x, y]) => [1 - y, x]);
   if (it.own) it.own = {x: 1 - it.own.y, y: it.own.x};
-  if (curBmp !== curRaw && curBmp.close) curBmp.close();
-  curBmp = rotBmp(curRaw, it.rot); it.w = curBmp.width; it.h = curBmp.height;
-  makeThumb(it, curBmp); syncUI(); fitCanvas();
+  reorient(it);
 });
+$('flipPhoto').addEventListener('click', () => {
+  const it = items[cur]; if (!it || it.err || !curBmp || !curRaw || stroke) return;
+  it.flip = !it.flip;
+  /* espelhar na horizontal, como se vê: (x, y) vira (1 - x, y) */
+  if (it.marks) for (const m of it.marks) m.pts = m.pts.map(([x, y]) => [1 - x, y]);
+  if (it.own) it.own = {x: 1 - it.own.x, y: it.own.y};
+  reorient(it);
+});
+function reorient(it) {
+  if (curBmp !== curRaw && curBmp.close) curBmp.close();
+  curBmp = rotBmp(curRaw, it.rot, it.flip); it.w = curBmp.width; it.h = curBmp.height;
+  makeThumb(it, curBmp); syncUI(); fitCanvas();
+}
 $('penDone').addEventListener('click', () => setPenMode(false));
 $('penColor').addEventListener('input', e => { pen.color = e.target.value; savePen(); syncPen(); });
 $('penSize').addEventListener('input', e => { pen.size = +e.target.value; savePen(); });
@@ -760,7 +776,7 @@ async function thumbQueue() {
   for (;;) {
     const it = items.find(x => !x.thumb && !x.err && x !== items[cur]); if (!it) break;
     try {
-      const bmp = await decode(it.file), o = rotBmp(bmp, it.rot);
+      const bmp = await decode(it.file), o = rotBmp(bmp, it.rot, it.flip);
       it.w = o.width; it.h = o.height;
       if (!it.thumb) makeThumb(it, o);
       bmp.close && bmp.close();
@@ -998,7 +1014,7 @@ function outType(it) {
   return {ext: f, mime: f === 'jpg' ? 'image/jpeg' : 'image/' + f};
 }
 async function renderOut(it, bmpIn) {
-  const raw = bmpIn ? null : await decode(it.file), bmp = bmpIn || rotBmp(raw, it.rot);
+  const raw = bmpIn ? null : await decode(it.file), bmp = bmpIn || rotBmp(raw, it.rot, it.flip);
   try {
     const max = +S.maxSide, long = Math.max(bmp.width, bmp.height);
     const s = max && long > max ? max / long : 1;
